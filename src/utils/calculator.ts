@@ -3,75 +3,239 @@
  * Todas as medidas operam em Centímetros (cm)
  */
 
+import { SheetType } from '../types';
+
+export interface SheetFormatInfo {
+  id: SheetType;
+  name: string;
+  badge: string;
+  widthCm: number;
+  heightCm: number;
+  printableWidthCm: number;
+  printableHeightCm: number;
+  description: string;
+}
+
+export const SHEET_FORMATS: Record<'a4' | 'a3' | 'sra3', SheetFormatInfo> = {
+  a4: {
+    id: 'a4',
+    name: 'A4',
+    badge: '21 x 29,7 cm',
+    widthCm: 21.0,
+    heightCm: 29.7,
+    printableWidthCm: 20.0,
+    printableHeightCm: 28.7,
+    description: 'Folha padrão A4 (área útil 20 x 28,7 cm)',
+  },
+  a3: {
+    id: 'a3',
+    name: 'A3',
+    badge: '29,7 x 42 cm',
+    widthCm: 29.7,
+    heightCm: 42.0,
+    printableWidthCm: 28.7,
+    printableHeightCm: 41.0,
+    description: 'Folha padrão A3 (área útil 28,7 x 41 cm)',
+  },
+  sra3: {
+    id: 'sra3',
+    name: 'SRA3',
+    badge: '33 x 48 cm',
+    widthCm: 33.0,
+    heightCm: 48.0,
+    printableWidthCm: 31.0,
+    printableHeightCm: 46.0,
+    description: 'Padrão Gráfica Digital (área útil 31 x 46 cm)',
+  },
+};
+
+// Folha padrão para gráfica rápida digital: SRA3 (para compatibilidade legada)
+export const SRA3_SHEET = SHEET_FORMATS.sra3;
+
+export interface NestingOptions {
+  sheetType?: SheetType;
+  customWidthCm?: number;
+  customHeightCm?: number;
+  rollWidthCm?: number;
+  bleedCm?: number;
+  quantity?: number;
+}
+
 export interface NestingResult {
+  sheetType: SheetType;
   orientation: 'direta' | 'girada';
   itemsPerSheet: number;
   cols: number;
   rows: number;
   wastePercent: number;
+  sheetWidthCm: number;
+  sheetHeightCm: number;
+  printableWidthCm: number;
+  printableHeightCm: number;
+  isRoll: boolean;
+  rollWidthCm?: number;
+  linearMetersNeeded?: number;
+  totalRollM2?: number;
+  itemsPerRow?: number;
 }
 
-// Folha padrão para gráfica rápida digital: SRA3 (33 x 48 cm, área imprimível útil 31 x 46 cm)
-export const SRA3_SHEET = {
-  widthCm: 33,
-  heightCm: 48,
-  printableWidthCm: 31,
-  printableHeightCm: 46,
-};
-
 /**
- * Calcula quantos itens cabem em uma folha SRA3 com 0,2 cm (2mm) de sangria
- * @param itemWidthCm Largura do item em centímetros (cm)
- * @param itemHeightCm Altura do item em centímetros (cm)
- * @param bleedCm Sangria técnica em centímetros (padrão 0.2 cm)
+ * Calcula o aproveitamento técnico em folhas cortadas (A4, A3, SRA3) ou bobina contínua.
  */
 export function calculateSheetNesting(
   itemWidthCm: number,
   itemHeightCm: number,
-  bleedCm: number = 0.2
+  bleedOrOptions: number | NestingOptions = 0.2,
+  explicitSheetType?: SheetType
 ): NestingResult {
-  const safeW = Math.max(1, itemWidthCm);
-  const safeH = Math.max(1, itemHeightCm);
+  let bleedCm = 0.2;
+  let options: NestingOptions = {};
+
+  if (typeof bleedOrOptions === 'number') {
+    bleedCm = bleedOrOptions;
+    if (explicitSheetType) {
+      options.sheetType = explicitSheetType;
+    }
+  } else if (bleedOrOptions && typeof bleedOrOptions === 'object') {
+    options = bleedOrOptions;
+    bleedCm = options.bleedCm ?? 0.2;
+  }
+
+  const sheetType: SheetType = options.sheetType || 'sra3';
+  const safeW = Math.max(0.5, itemWidthCm);
+  const safeH = Math.max(0.5, itemHeightCm);
 
   const fullW = safeW + bleedCm * 2;
   const fullH = safeH + bleedCm * 2;
 
+  // CASO 1: BOBINA PERSONALIZADA (ROLO CONTÍNUO)
+  if (sheetType === 'bobina') {
+    const rollWidth = Math.max(10, options.rollWidthCm || 60);
+    // Margens laterais de tração/pinças da impressora/plotter: 0.5 cm de cada lado (total 1 cm)
+    const printableWidth = Math.max(5, rollWidth - 1.0);
+
+    // Itens na horizontal direta vs girada 90º
+    const colsDirect = Math.floor(printableWidth / fullW);
+    const colsRotated = Math.floor(printableWidth / fullH);
+
+    let orientation: 'direta' | 'girada' = 'direta';
+    let cols = Math.max(1, colsDirect);
+    let itemStepH = fullH;
+
+    if (colsRotated > 0 && colsDirect <= 0) {
+      orientation = 'girada';
+      cols = colsRotated;
+      itemStepH = fullW;
+    } else if (colsDirect > 0 && colsRotated <= 0) {
+      orientation = 'direta';
+      cols = colsDirect;
+      itemStepH = fullH;
+    } else if (colsDirect > 0 && colsRotated > 0) {
+      // Compara avanço linear por unidade produzida (menor avanço por item = mais econômico)
+      const advancePerItemDirect = fullH / colsDirect;
+      const advancePerItemRotated = fullW / colsRotated;
+      if (advancePerItemRotated < advancePerItemDirect) {
+        orientation = 'girada';
+        cols = colsRotated;
+        itemStepH = fullW;
+      } else {
+        orientation = 'direta';
+        cols = colsDirect;
+        itemStepH = fullH;
+      }
+    }
+
+    const qty = Math.max(1, options.quantity || 100);
+    const rows = Math.ceil(qty / cols);
+    const printedLengthCm = rows * itemStepH;
+    // Margem técnica de carregamento e refile da bobina: 20 cm
+    const totalLinearLengthCm = Math.ceil(printedLengthCm + 20);
+    const linearMetersNeeded = Number((totalLinearLengthCm / 100).toFixed(2));
+    const totalRollM2 = Number(((rollWidth / 100) * (totalLinearLengthCm / 100)).toFixed(3));
+    const usedAreaM2 = Number((qty * (safeW / 100) * (safeH / 100)).toFixed(3));
+    const wastePercent = Math.max(
+      0,
+      Math.min(95, Math.round(((totalRollM2 - usedAreaM2) / Math.max(0.001, totalRollM2)) * 100))
+    );
+
+    // Altura virtual proporcional para o preview SVG da bobina
+    const previewWebLengthCm = Math.min(120, Math.max(40, rows * itemStepH + 10));
+
+    return {
+      sheetType: 'bobina',
+      orientation,
+      itemsPerSheet: cols,
+      itemsPerRow: cols,
+      cols,
+      rows,
+      wastePercent,
+      sheetWidthCm: rollWidth,
+      sheetHeightCm: previewWebLengthCm,
+      printableWidthCm: printableWidth,
+      printableHeightCm: previewWebLengthCm - 2,
+      isRoll: true,
+      rollWidthCm: rollWidth,
+      linearMetersNeeded,
+      totalRollM2,
+    };
+  }
+
+  // CASO 2: FOLHAS CORTADAS (A4, A3, SRA3)
+  const format = SHEET_FORMATS[sheetType as 'a4' | 'a3' | 'sra3'] || SHEET_FORMATS.sra3;
+  const sheetW = format.widthCm;
+  const sheetH = format.heightCm;
+  const printW = format.printableWidthCm;
+  const printH = format.printableHeightCm;
+
   // Orientação direta
-  const colsDirect = Math.floor(SRA3_SHEET.printableWidthCm / fullW);
-  const rowsDirect = Math.floor(SRA3_SHEET.printableHeightCm / fullH);
+  const colsDirect = Math.floor(printW / fullW);
+  const rowsDirect = Math.floor(printH / fullH);
   const totalDirect = Math.max(1, colsDirect * rowsDirect);
 
   // Orientação girada 90º
-  const colsRotated = Math.floor(SRA3_SHEET.printableWidthCm / fullH);
-  const rowsRotated = Math.floor(SRA3_SHEET.printableHeightCm / fullW);
+  const colsRotated = Math.floor(printW / fullH);
+  const rowsRotated = Math.floor(printH / fullW);
   const totalRotated = Math.max(1, colsRotated * rowsRotated);
 
-  const totalArea = SRA3_SHEET.widthCm * SRA3_SHEET.heightCm;
+  const totalArea = sheetW * sheetH;
 
   if (totalRotated > totalDirect) {
     const usedArea = totalRotated * (safeW * safeH);
     const waste = Math.max(0, Math.min(95, ((totalArea - usedArea) / totalArea) * 100));
     return {
+      sheetType,
       orientation: 'girada',
       itemsPerSheet: totalRotated,
       cols: colsRotated,
       rows: rowsRotated,
       wastePercent: Math.round(waste),
+      sheetWidthCm: sheetW,
+      sheetHeightCm: sheetH,
+      printableWidthCm: printW,
+      printableHeightCm: printH,
+      isRoll: false,
     };
   }
 
   const usedArea = totalDirect * (safeW * safeH);
   const waste = Math.max(0, Math.min(95, ((totalArea - usedArea) / totalArea) * 100));
   return {
+    sheetType,
     orientation: 'direta',
     itemsPerSheet: totalDirect,
     cols: colsDirect,
     rows: rowsDirect,
     wastePercent: Math.round(waste),
+    sheetWidthCm: sheetW,
+    sheetHeightCm: sheetH,
+    printableWidthCm: printW,
+    printableHeightCm: printH,
+    isRoll: false,
   };
 }
 
 export interface CostCalculationResult {
+  sheetType: SheetType;
   nestingOrientation?: 'direta' | 'girada';
   itemsPerSheet: number;
   sheetsNeeded: number;
@@ -82,6 +246,10 @@ export interface CostCalculationResult {
   machineLaborCost: number;
   totalCost: number;
   unitCost: number;
+  isRoll?: boolean;
+  rollWidthCm?: number;
+  linearMetersNeeded?: number;
+  totalRollM2?: number;
   suggestedPrices: {
     min: { markup: number; price: number; unitPrice: number; profit: number };
     recommended: { markup: number; price: number; unitPrice: number; profit: number };
@@ -101,6 +269,8 @@ export function calculateOrderCost(params: {
   machineHourlyRate: number;
   machineSpeedPerHour: number;
   markupPercent?: number;
+  sheetType?: SheetType;
+  rollWidthCm?: number;
 }): CostCalculationResult {
   const {
     quantity,
@@ -114,6 +284,8 @@ export function calculateOrderCost(params: {
     machineHourlyRate,
     machineSpeedPerHour,
     markupPercent = 120,
+    sheetType = 'sra3',
+    rollWidthCm = 60,
   } = params;
 
   let itemsPerSheet = 1;
@@ -123,9 +295,80 @@ export function calculateOrderCost(params: {
   let materialCost = 0;
   let clickCost = 0;
   let nestingOrientation: 'direta' | 'girada' | undefined = undefined;
+  let isRoll = false;
+  let linearMetersNeeded: number | undefined = undefined;
+  let totalRollM2: number | undefined = undefined;
 
-  if (isPlotterM2) {
-    // Cálculo em metros quadrados a partir de centímetros: (L cm / 100) * (A cm / 100)
+  // CASO A: BOBINA PERSONALIZADA
+  if (sheetType === 'bobina') {
+    isRoll = true;
+    const nesting = calculateSheetNesting(widthCm, heightCm, {
+      sheetType: 'bobina',
+      rollWidthCm,
+      quantity,
+    });
+    nestingOrientation = nesting.orientation;
+    itemsPerSheet = nesting.itemsPerSheet;
+    linearMetersNeeded = nesting.linearMetersNeeded || 1;
+    totalRollM2 = nesting.totalRollM2 || 1;
+
+    sheetsNeeded = nesting.rows;
+    wasteSheets = Number((linearMetersNeeded * 0.05).toFixed(2));
+    totalSheetsToConsume = linearMetersNeeded;
+
+    // Custo do substrato (se for cadastrado em m², calcula por m² consumido; se for por folha, usa base linear)
+    materialCost = totalRollM2 * costPerSheetOrM2;
+
+    const isColor = printSides === '4x0' || printSides === '4x4';
+    const clickUnitPrice = isColor ? (clickCostColor > 0 ? clickCostColor : 12.0) : clickCostPB;
+    // Em bobina/plotter, o clique/tinta é proporcional à área impressa em m²
+    clickCost = totalRollM2 * clickUnitPrice;
+
+    const speedM2 = Math.max(4, machineSpeedPerHour || 15);
+    const hours = totalRollM2 / speedM2;
+    const machineLaborCost = Math.max(3.0, hours * (machineHourlyRate || 35.0));
+
+    const totalCost = Number((materialCost + clickCost + machineLaborCost).toFixed(2));
+    const unitCost = quantity > 0 ? Number((totalCost / quantity).toFixed(3)) : 0;
+
+    const buildTier = (markup: number) => {
+      const raw = totalCost * (1 + markup / 100);
+      const price = Math.max(15, Math.ceil(raw));
+      const unitPrice = quantity > 0 ? Number((price / quantity).toFixed(3)) : 0;
+      const profit = Number((price - totalCost).toFixed(2));
+      return { markup, price, unitPrice, profit };
+    };
+
+    const recMarkup = Math.max(40, markupPercent);
+    const minMarkup = Math.max(25, Math.round(recMarkup * 0.7));
+    const premMarkup = Math.round(recMarkup * 1.4);
+
+    return {
+      sheetType: 'bobina',
+      nestingOrientation,
+      itemsPerSheet,
+      sheetsNeeded,
+      wasteSheets,
+      totalSheetsToConsume,
+      materialCost: Number(materialCost.toFixed(2)),
+      clickCost: Number(clickCost.toFixed(2)),
+      machineLaborCost: Number(machineLaborCost.toFixed(2)),
+      totalCost,
+      unitCost,
+      isRoll: true,
+      rollWidthCm,
+      linearMetersNeeded,
+      totalRollM2,
+      suggestedPrices: {
+        min: buildTier(minMarkup),
+        recommended: buildTier(recMarkup),
+        premium: buildTier(premMarkup),
+      },
+    };
+  }
+
+  // CASO B: PLOTTER POR M² TRADICIONAL
+  if (isPlotterM2 && sheetType !== 'a4' && sheetType !== 'a3' && sheetType !== 'sra3') {
     const unitAreaM2 = (widthCm / 100) * (heightCm / 100);
     const totalAreaM2 = unitAreaM2 * quantity;
     const billedAreaM2 = Math.max(0.25, totalAreaM2 * 1.05); // 5% de margem técnica
@@ -136,7 +379,11 @@ export function calculateOrderCost(params: {
     materialCost = totalSheetsToConsume * costPerSheetOrM2;
     clickCost = billedAreaM2 * (clickCostColor > 0 ? clickCostColor : 14.0);
   } else {
-    const nesting = calculateSheetNesting(widthCm, heightCm);
+    // CASO C: FOLHAS CORTADAS (A4, A3, SRA3)
+    const nesting = calculateSheetNesting(widthCm, heightCm, {
+      sheetType: sheetType as 'a4' | 'a3' | 'sra3',
+      quantity,
+    });
     nestingOrientation = nesting.orientation;
     itemsPerSheet = nesting.itemsPerSheet;
     sheetsNeeded = Math.ceil(quantity / itemsPerSheet);
@@ -170,6 +417,7 @@ export function calculateOrderCost(params: {
   const premMarkup = Math.round(recMarkup * 1.4);
 
   return {
+    sheetType,
     nestingOrientation: isPlotterM2 ? undefined : nestingOrientation,
     itemsPerSheet,
     sheetsNeeded,
@@ -180,6 +428,7 @@ export function calculateOrderCost(params: {
     machineLaborCost: Number(machineLaborCost.toFixed(2)),
     totalCost,
     unitCost,
+    isRoll: false,
     suggestedPrices: {
       min: buildTier(minMarkup),
       recommended: buildTier(recMarkup),
@@ -224,6 +473,9 @@ export function generateWhatsAppMessage(params: {
   materialName: string;
   totalPrice: number;
   unitPrice: number;
+  hasDelivery?: boolean;
+  deliveryFee?: number;
+  deliveryAddress?: string;
   notes?: string;
 }): string {
   const {
@@ -236,6 +488,9 @@ export function generateWhatsAppMessage(params: {
     materialName,
     totalPrice,
     unitPrice,
+    hasDelivery,
+    deliveryFee = 7,
+    deliveryAddress,
     notes,
   } = params;
 
@@ -246,6 +501,9 @@ export function generateWhatsAppMessage(params: {
     `🔢 *Quantidade:* ${quantity.toLocaleString('pt-BR')} unidades\n` +
     `📏 *Tamanho / Formato:* ${widthCm} x ${heightCm} cm (${printSides})\n` +
     `📄 *Papel / Material:* ${materialName}\n` +
+    (hasDelivery
+      ? `🚚 *Entrega:* Sim (+ ${formatBRL(deliveryFee)})${deliveryAddress ? `\n📍 *Endereço:* ${deliveryAddress}` : ''}\n`
+      : `🏪 *Retirada:* No balcão da gráfica\n`) +
     (notes ? `📝 *Observações:* ${notes}\n` : '') +
     `\n` +
     `💰 *Valor Total:* ${formatBRL(totalPrice)}\n` +

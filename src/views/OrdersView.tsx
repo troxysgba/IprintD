@@ -268,9 +268,21 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                       <span className="font-medium">{ord.productName}</span>
                     </div>
 
-                    <div className="text-[11px] text-slate-500 flex flex-wrap gap-2">
+                    <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-2">
                       <span className="font-bold text-slate-700">Tamanho: {ord.widthCm} x {ord.heightCm} cm</span>
                       <span>({ord.printSides})</span>
+                      {ord.sheetType && (
+                        <span className="bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.2 rounded font-bold text-[10px]">
+                          {ord.sheetType === 'bobina'
+                            ? `Bobina ${ord.rollWidthCm || 60} cm`
+                            : `Folha ${ord.sheetType.toUpperCase()}`}
+                        </span>
+                      )}
+                      {ord.hasDelivery && (
+                        <span className="bg-emerald-50 text-emerald-900 border border-emerald-200 px-1.5 py-0.2 rounded font-bold text-[10px]">
+                          🚚 Entrega (+R$ 7)
+                        </span>
+                      )}
                       <span>·</span>
                       <span>Material: {ord.materialName}</span>
                       <span>·</span>

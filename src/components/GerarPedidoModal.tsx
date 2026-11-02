@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Equipment, Material, Order, QuickProductPreset } from '../types';
+import { Equipment, Material, Order, QuickProductPreset, SheetType } from '../types';
 import {
   calculateOrderCost,
   formatBRL,
@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Truck,
   User,
   X,
 } from 'lucide-react';
@@ -27,6 +28,7 @@ interface GerarPedidoModalProps {
   materials: Material[];
   equipments: Equipment[];
   presets: QuickProductPreset[];
+  initialOrderData?: Partial<Order> | null;
   onAddPreset: (preset: QuickProductPreset) => void;
   onUpdatePreset: (preset: QuickProductPreset) => void;
   onDeletePreset: (presetId: string) => void;
@@ -38,23 +40,42 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
   materials,
   equipments,
   presets,
+  initialOrderData,
   onAddPreset,
   onUpdatePreset,
   onDeletePreset,
   onSaveOrder,
   onClose,
 }) => {
-  // 1. Dados do Cliente
-  const [clientName, setClientName] = useState('');
-  const [clientPhone, setClientPhone] = useState('');
+  // 1. Dados do Cliente e Entrega
+  const [clientName, setClientName] = useState(initialOrderData?.clientName || '');
+  const [clientPhone, setClientPhone] = useState(initialOrderData?.clientPhone || '');
+  const [hasDelivery, setHasDelivery] = useState<boolean>(
+    initialOrderData?.hasDelivery || false
+  );
+  const [deliveryAddress, setDeliveryAddress] = useState<string>(
+    initialOrderData?.deliveryAddress || ''
+  );
 
   // 2. Produto e Especificações em Centímetros (cm)
-  const [productName, setProductName] = useState('Cartão de Visita 9x5 cm Couché 300g');
-  const [quantity, setQuantity] = useState<number>(1000);
-  const [widthCm, setWidthCm] = useState<number>(9);
-  const [heightCm, setHeightCm] = useState<number>(5);
-  const [printSides, setPrintSides] = useState<'4x0' | '4x4' | '1x0' | '1x1'>('4x4');
-  const [notes, setNotes] = useState('');
+  const [productName, setProductName] = useState(
+    initialOrderData?.productName || 'Cartão de Visita 9x5 cm Couché 300g'
+  );
+  const [quantity, setQuantity] = useState<number>(initialOrderData?.quantity || 1000);
+  const [widthCm, setWidthCm] = useState<number>(initialOrderData?.widthCm || 9);
+  const [heightCm, setHeightCm] = useState<number>(initialOrderData?.heightCm || 5);
+  const [printSides, setPrintSides] = useState<'4x0' | '4x4' | '1x0' | '1x1'>(
+    initialOrderData?.printSides || '4x4'
+  );
+  const [notes, setNotes] = useState(initialOrderData?.notes || '');
+
+  // Aproveitamento de folha / mídia
+  const [sheetType, setSheetType] = useState<SheetType>(
+    initialOrderData?.sheetType || 'a4'
+  );
+  const [rollWidthCm, setRollWidthCm] = useState<number>(
+    initialOrderData?.rollWidthCm || 60
+  );
 
   // 3. Material e Máquina
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>(
@@ -113,6 +134,26 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
   const isPlotter = selectedEquipment?.category === 'plotter' || selectedMaterial?.unit === 'm2';
 
+  // Sincroniza com dados enviados pelo cálculo de custo
+  React.useEffect(() => {
+    if (initialOrderData) {
+      if (initialOrderData.clientName) setClientName(initialOrderData.clientName);
+      if (initialOrderData.clientPhone) setClientPhone(initialOrderData.clientPhone);
+      if (initialOrderData.productName) setProductName(initialOrderData.productName);
+      if (initialOrderData.quantity) setQuantity(initialOrderData.quantity);
+      if (initialOrderData.widthCm) setWidthCm(initialOrderData.widthCm);
+      if (initialOrderData.heightCm) setHeightCm(initialOrderData.heightCm);
+      if (initialOrderData.printSides) setPrintSides(initialOrderData.printSides);
+      if (initialOrderData.sheetType) setSheetType(initialOrderData.sheetType);
+      if (initialOrderData.rollWidthCm) setRollWidthCm(initialOrderData.rollWidthCm);
+      if (initialOrderData.materialId) setSelectedMaterialId(initialOrderData.materialId);
+      if (initialOrderData.equipmentId) setSelectedEquipmentId(initialOrderData.equipmentId);
+      if (initialOrderData.hasDelivery !== undefined) setHasDelivery(initialOrderData.hasDelivery);
+      if (initialOrderData.deliveryAddress) setDeliveryAddress(initialOrderData.deliveryAddress);
+      if (initialOrderData.finalPrice) setCustomFinalPrice(initialOrderData.finalPrice);
+    }
+  }, [initialOrderData]);
+
   // Cost and Suggested Price Calculation in Real Time with Centimeters
   const costResult = useMemo(() => {
     if (!selectedMaterial || !selectedEquipment) return null;
@@ -128,6 +169,8 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       machineHourlyRate: selectedEquipment.hourlyRate,
       machineSpeedPerHour: selectedEquipment.speedPerHour,
       markupPercent,
+      sheetType,
+      rollWidthCm,
     });
   }, [
     quantity,
@@ -138,15 +181,22 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
     selectedEquipment,
     isPlotter,
     markupPercent,
+    sheetType,
+    rollWidthCm,
   ]);
 
-  const activeTotalPrice = useMemo(() => {
+  const basePrice = useMemo(() => {
     if (customFinalPrice !== null) return customFinalPrice;
     return costResult?.suggestedPrices.recommended.price || 0;
   }, [customFinalPrice, costResult]);
 
+  // Se for para entregar, acrescenta R$ 7 reais no preço final do produto
+  const activeTotalPrice = useMemo(() => {
+    return Number((basePrice + (hasDelivery ? 7 : 0)).toFixed(2));
+  }, [basePrice, hasDelivery]);
+
   const activeUnitPrice = useMemo(() => {
-    return quantity > 0 ? activeTotalPrice / quantity : 0;
+    return quantity > 0 ? Number((activeTotalPrice / quantity).toFixed(3)) : 0;
   }, [activeTotalPrice, quantity]);
 
   // Apply preset to current order
@@ -187,6 +237,9 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       materialName: selectedMaterial?.name || 'Padrão',
       totalPrice: activeTotalPrice,
       unitPrice: activeUnitPrice,
+      hasDelivery,
+      deliveryFee: 7,
+      deliveryAddress,
       notes,
     });
   }, [
@@ -199,6 +252,8 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
     selectedMaterial,
     activeTotalPrice,
     activeUnitPrice,
+    hasDelivery,
+    deliveryAddress,
     notes,
   ]);
 
@@ -308,6 +363,9 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       materialName: selectedMaterial?.name || '',
       equipmentId: selectedEquipment?.id || '',
       equipmentName: selectedEquipment?.name || '',
+      sheetType,
+      rollWidthCm: sheetType === 'bobina' ? rollWidthCm : undefined,
+      linearMetersNeeded: costResult?.linearMetersNeeded,
       itemsPerSheet: costResult?.itemsPerSheet || 1,
       sheetsNeeded: costResult?.sheetsNeeded || 0,
       wasteSheets: costResult?.wasteSheets || 0,
@@ -318,6 +376,9 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       suggestedPrice: costResult?.suggestedPrices.recommended.price || activeTotalPrice,
       finalPrice: activeTotalPrice,
       unitPrice: activeUnitPrice,
+      hasDelivery,
+      deliveryFee: hasDelivery ? 7 : 0,
+      deliveryAddress: hasDelivery ? deliveryAddress.trim() : undefined,
       notes: notes.trim(),
       stockDeducted: false,
     };
@@ -475,6 +536,79 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                     />
                   </div>
                 </div>
+
+                {/* Opção: Fazer entrega ou não (+ R$ 7,00 se for para entregar) */}
+                <div className="pt-2.5 border-t border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Truck className="w-3.5 h-3.5 text-amber-600" />
+                      <span>É para fazer entrega?</span>
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      {hasDelivery ? 'Taxa: + R$ 7,00 no preço final' : 'Retirada no balcão (grátis)'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Opção Não (Retirada Balcão) */}
+                    <button
+                      type="button"
+                      onClick={() => setHasDelivery(false)}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                        !hasDelivery
+                          ? 'bg-white border-slate-900 ring-2 ring-slate-900/10 text-slate-900 shadow-2xs font-semibold'
+                          : 'bg-white/60 hover:bg-white border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">
+                          🏪 Não (Retirada Balcão)
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Cliente retira na loja</p>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        Grátis
+                      </span>
+                    </button>
+
+                    {/* Opção Sim (Fazer Entrega) */}
+                    <button
+                      type="button"
+                      onClick={() => setHasDelivery(true)}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                        hasDelivery
+                          ? 'bg-amber-50 border-amber-500 ring-2 ring-amber-500/30 text-slate-900 shadow-2xs font-semibold'
+                          : 'bg-white/60 hover:bg-white border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">
+                          🚚 Sim (Fazer Entrega)
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Motoboy / Envio</p>
+                      </div>
+                      <span className="text-[10px] font-mono font-black text-amber-950 bg-amber-200/90 px-2 py-0.5 rounded border border-amber-300">
+                        + R$ 7,00
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Endereço de Entrega */}
+                  {hasDelivery && (
+                    <div className="pt-1.5 animate-in fade-in duration-150">
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Endereço para Entrega:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Rua, número, bairro, complemento ou ponto de referência..."
+                        value={deliveryAddress}
+                        onChange={(e) => setDeliveryAddress(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* 2. Especificação do Produto em Centímetros (cm) */}
@@ -501,6 +635,80 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                     onChange={(e) => setProductName(e.target.value)}
                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20"
                   />
+                </div>
+
+                {/* Seletor de Aproveitamento de Folha / Bobina */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Formato de Aproveitamento da Folha / Mídia:
+                    </label>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {sheetType === 'bobina' ? `Rolo ${rollWidthCm} cm` : sheetType.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: 'a4', label: 'A4', desc: '21×29,7 cm' },
+                      { id: 'a3', label: 'A3', desc: '29,7×42 cm' },
+                      { id: 'bobina', label: 'Bobina', desc: 'Rolo cm' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setSheetType(f.id as SheetType)}
+                        className={`px-2.5 py-1.5 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                          sheetType === f.id
+                            ? 'bg-amber-100 border-amber-400 text-slate-900 font-bold ring-1 ring-amber-400/50'
+                            : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold">{f.label}</span>
+                          <span className="text-[9px] font-mono opacity-80">{f.desc}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {sheetType === 'bobina' && (
+                    <div className="p-2.5 bg-amber-500/10 border border-amber-300 rounded-lg flex flex-wrap items-center justify-between gap-2 mt-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-800">Largura da Bobina:</span>
+                        <input
+                          type="number"
+                          min="10"
+                          max="320"
+                          value={rollWidthCm}
+                          onChange={(e) =>
+                            setRollWidthCm(
+                              Math.max(10, Math.min(320, parseFloat(e.target.value) || 10))
+                            )
+                          }
+                          className="w-16 px-2 py-0.5 text-xs font-mono font-bold bg-white border border-amber-400 rounded text-center"
+                        />
+                        <span className="text-xs font-bold text-slate-600">cm</span>
+                      </div>
+
+                      <div className="flex gap-1">
+                        {[30, 60, 90, 100, 120, 160].map((w) => (
+                          <button
+                            key={w}
+                            type="button"
+                            onClick={() => setRollWidthCm(w)}
+                            className={`px-1.5 py-0.5 text-[10px] font-mono rounded border cursor-pointer ${
+                              rollWidthCm === w
+                                ? 'bg-amber-400 text-slate-950 font-bold border-amber-500'
+                                : 'bg-white text-slate-600 border-amber-200'
+                            }`}
+                          >
+                            {w}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -638,18 +846,22 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                 </div>
 
                 {/* Aproveitamento em Centímetros */}
-                {costResult && !isPlotter && (
+                {costResult && (
                   <div className="bg-amber-50/70 p-3 rounded-lg border border-amber-200 text-xs flex items-center justify-between">
                     <div>
                       <span className="font-bold text-amber-900">
-                        {costResult.itemsPerSheet} peças por folha SRA3
+                        {sheetType === 'bobina'
+                          ? `${costResult.itemsPerSheet} peças por fila (Bobina ${rollWidthCm}cm)`
+                          : `${costResult.itemsPerSheet} peças por folha ${sheetType.toUpperCase()}`}
                       </span>
                       <span className="text-amber-700 ml-1">
-                        (Orientação {costResult.nestingOrientation})
+                        ({costResult.nestingOrientation})
                       </span>
                     </div>
                     <div className="text-amber-900 font-mono font-bold">
-                      {costResult.totalSheetsToConsume} folhas necessárias
+                      {sheetType === 'bobina'
+                        ? `${costResult.linearMetersNeeded} m lineares (${costResult.totalRollM2} m²)`
+                        : `${costResult.totalSheetsToConsume} folhas necessárias`}
                     </div>
                   </div>
                 )}
@@ -743,6 +955,17 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                         {formatBRL(costResult.suggestedPrices.premium.unitPrice)}/un
                       </div>
                     </button>
+                  </div>
+                )}
+
+                {/* Indicador de Entrega na Composição do Preço */}
+                {hasDelivery && (
+                  <div className="flex items-center justify-between text-xs text-amber-900 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200">
+                    <span className="flex items-center gap-1.5 font-bold">
+                      <Truck className="w-3.5 h-3.5 text-amber-600" />
+                      Taxa de Entrega Adicional:
+                    </span>
+                    <span className="font-mono font-black text-amber-900">+ R$ 7,00</span>
                   </div>
                 )}
 

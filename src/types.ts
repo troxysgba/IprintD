@@ -10,6 +10,8 @@ export type PaymentStatus = 'pendente' | 'parcial' | 'pago';
 
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'faturado';
 
+export type SheetType = 'sra3' | 'a3' | 'a4' | 'bobina';
+
 export interface Order {
   id: string;
   code: string; // ex: OS-1042
@@ -34,6 +36,9 @@ export interface Order {
   equipmentName: string;
 
   // Imposição & Produção
+  sheetType?: SheetType;
+  rollWidthCm?: number;
+  linearMetersNeeded?: number;
   itemsPerSheet: number;
   sheetsNeeded: number;
   wasteSheets: number;
@@ -46,6 +51,9 @@ export interface Order {
   suggestedPrice: number;
   finalPrice: number;
   unitPrice: number;
+  hasDelivery?: boolean;
+  deliveryFee?: number;
+  deliveryAddress?: string;
   notes?: string;
   stockDeducted?: boolean;
 }
@@ -103,6 +111,8 @@ export interface QuickProductPreset {
   materialKeyword: string;
   equipmentId?: string;
   isPlotter?: boolean;
+  sheetType?: SheetType;
+  rollWidthCm?: number;
 }
 
 export type ActivePage = 'visao_geral' | 'pedidos' | 'calculo_custo' | 'estoque' | 'maquinas';

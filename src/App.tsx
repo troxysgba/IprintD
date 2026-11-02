@@ -37,8 +37,14 @@ export default function App() {
 
   // Modals state
   const [isGerarPedidoOpen, setIsGerarPedidoOpen] = useState(false);
+  const [orderPrefill, setOrderPrefill] = useState<Partial<Order> | null>(null);
   const [selectedJobTicketOrder, setSelectedJobTicketOrder] = useState<Order | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleOpenGerarPedido = (prefill?: Partial<Order>) => {
+    setOrderPrefill(prefill || null);
+    setIsGerarPedidoOpen(true);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -251,7 +257,7 @@ export default function App() {
             materials={materials}
             equipments={equipments}
             presets={presets}
-            onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
+            onOpenGerarPedido={handleOpenGerarPedido}
           />
         )}
 
@@ -272,7 +278,7 @@ export default function App() {
             onAddEquipment={handleAddEquipment}
             onUpdateEquipment={handleUpdateEquipment}
             onDeleteEquipment={handleDeleteEquipment}
-            onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
+            onOpenGerarPedido={() => handleOpenGerarPedido()}
           />
         )}
       </main>
@@ -283,11 +289,15 @@ export default function App() {
           materials={materials}
           equipments={equipments}
           presets={presets}
+          initialOrderData={orderPrefill}
           onAddPreset={handleAddPreset}
           onUpdatePreset={handleUpdatePreset}
           onDeletePreset={handleDeletePreset}
           onSaveOrder={handleSaveOrder}
-          onClose={() => setIsGerarPedidoOpen(false)}
+          onClose={() => {
+            setIsGerarPedidoOpen(false);
+            setOrderPrefill(null);
+          }}
         />
       )}
 

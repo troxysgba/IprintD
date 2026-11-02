@@ -63,13 +63,27 @@ export const JobTicketModal: React.FC<JobTicketModalProps> = ({ order, onClose }
           </div>
 
           {/* Client & Production Deadlines Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-100 p-3 rounded-lg border border-slate-300">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-100 p-3 rounded-lg border border-slate-300">
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-500 block">
                 Cliente / Solicitante
               </span>
               <span className="font-bold text-slate-900 text-sm">{order.clientName}</span>
               <div className="text-[11px] font-mono text-slate-600">{order.clientPhone}</div>
+            </div>
+
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                Entrega / Logística
+              </span>
+              <span className="font-bold text-sm text-slate-900 block">
+                {order.hasDelivery ? '🚚 Fazer Entrega (+R$ 7)' : '🏪 Retirada no Balcão'}
+              </span>
+              {order.deliveryAddress && (
+                <div className="text-[10px] text-slate-600 truncate max-w-[180px]" title={order.deliveryAddress}>
+                  {order.deliveryAddress}
+                </div>
+              )}
             </div>
 
             <div>
@@ -81,7 +95,7 @@ export const JobTicketModal: React.FC<JobTicketModalProps> = ({ order, onClose }
               </span>
             </div>
 
-            <div className="sm:text-right col-span-2 sm:col-span-1">
+            <div className="sm:text-right">
               <span className="text-[10px] uppercase font-bold text-slate-500 block">
                 Pagamento
               </span>
@@ -112,36 +126,43 @@ export const JobTicketModal: React.FC<JobTicketModalProps> = ({ order, onClose }
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded border border-slate-200 font-mono text-[11px]">
               <div>
                 <span className="text-[9px] font-sans text-slate-500 uppercase block">
-                  Tamanho de Corte
+                  Formato / Mídia
                 </span>
                 <span className="font-bold text-slate-900">
-                  {order.widthCm} × {order.heightCm} cm
+                  {order.sheetType === 'bobina'
+                    ? `Bobina ${order.rollWidthCm || 60} cm`
+                    : `Folha ${(order.sheetType || 'sra3').toUpperCase()}`}
                 </span>
               </div>
 
               <div>
                 <span className="text-[9px] font-sans text-slate-500 uppercase block">
-                  Cores / Lados
+                  Corte / Cores
                 </span>
-                <span className="font-bold text-slate-900">{order.printSides}</span>
+                <span className="font-bold text-slate-900">
+                  {order.widthCm}×{order.heightCm} cm ({order.printSides})
+                </span>
               </div>
 
               <div>
                 <span className="text-[9px] font-sans text-slate-500 uppercase block">
-                  Rendimento Imposição
+                  {order.sheetType === 'bobina' ? 'Itens por Fila' : 'Rendimento Imposição'}
                 </span>
                 <span className="font-bold text-amber-800">
-                  {order.itemsPerSheet} unid / folha
+                  {order.sheetType === 'bobina'
+                    ? `${order.itemsPerSheet} unid / fila`
+                    : `${order.itemsPerSheet} unid / folha`}
                 </span>
               </div>
 
               <div>
                 <span className="text-[9px] font-sans text-slate-500 uppercase block">
-                  Requisição de Papel
+                  {order.sheetType === 'bobina' ? 'Requisição de Mídia' : 'Requisição de Papel'}
                 </span>
                 <span className="font-bold text-slate-900">
-                  {order.sheetsNeeded} + {order.wasteSheets} quebra ={' '}
-                  {(order.sheetsNeeded || 0) + (order.wasteSheets || 0)} folhas
+                  {order.sheetType === 'bobina'
+                    ? `${order.linearMetersNeeded || order.sheetsNeeded} m lineares`
+                    : `${order.sheetsNeeded} + ${order.wasteSheets} quebra = ${(order.sheetsNeeded || 0) + (order.wasteSheets || 0)} folhas`}
                 </span>
               </div>
             </div>
