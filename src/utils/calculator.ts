@@ -234,6 +234,15 @@ export function calculateSheetNesting(
   };
 }
 
+export interface PriceTier {
+  markup: number;
+  basePrice: number;
+  inkCost: number;
+  price: number;
+  unitPrice: number;
+  profit: number;
+}
+
 export interface CostCalculationResult {
   sheetType: SheetType;
   nestingOrientation?: 'direta' | 'girada';
@@ -244,6 +253,7 @@ export interface CostCalculationResult {
   materialCost: number;
   clickCost: number;
   machineLaborCost: number;
+  inkCost: number; // Custo com tinta calculado em 3% do valor do pedido
   totalCost: number;
   unitCost: number;
   isRoll?: boolean;
@@ -251,9 +261,9 @@ export interface CostCalculationResult {
   linearMetersNeeded?: number;
   totalRollM2?: number;
   suggestedPrices: {
-    min: { markup: number; price: number; unitPrice: number; profit: number };
-    recommended: { markup: number; price: number; unitPrice: number; profit: number };
-    premium: { markup: number; price: number; unitPrice: number; profit: number };
+    min: PriceTier;
+    recommended: PriceTier;
+    premium: PriceTier;
   };
 }
 
@@ -331,17 +341,24 @@ export function calculateOrderCost(params: {
     const totalCost = Number((materialCost + clickCost + machineLaborCost).toFixed(2));
     const unitCost = quantity > 0 ? Number((totalCost / quantity).toFixed(3)) : 0;
 
-    const buildTier = (markup: number) => {
+    const buildTier = (markup: number): PriceTier => {
       const raw = totalCost * (1 + markup / 100);
-      const price = Math.max(15, Math.ceil(raw));
+      const basePrice = Math.max(15, Math.ceil(raw));
+      // Custo com tinta é 3% do valor total do pedido (ex: R$ 100 -> + R$ 3 = R$ 103)
+      const inkCost = Number((basePrice * 0.03).toFixed(2));
+      const price = Number((basePrice + inkCost).toFixed(2));
       const unitPrice = quantity > 0 ? Number((price / quantity).toFixed(3)) : 0;
       const profit = Number((price - totalCost).toFixed(2));
-      return { markup, price, unitPrice, profit };
+      return { markup, basePrice, inkCost, price, unitPrice, profit };
     };
 
     const recMarkup = Math.max(40, markupPercent);
     const minMarkup = Math.max(25, Math.round(recMarkup * 0.7));
     const premMarkup = Math.round(recMarkup * 1.4);
+
+    const minTier = buildTier(minMarkup);
+    const recTier = buildTier(recMarkup);
+    const premTier = buildTier(premMarkup);
 
     return {
       sheetType: 'bobina',
@@ -353,6 +370,7 @@ export function calculateOrderCost(params: {
       materialCost: Number(materialCost.toFixed(2)),
       clickCost: Number(clickCost.toFixed(2)),
       machineLaborCost: Number(machineLaborCost.toFixed(2)),
+      inkCost: recTier.inkCost,
       totalCost,
       unitCost,
       isRoll: true,
@@ -360,9 +378,9 @@ export function calculateOrderCost(params: {
       linearMetersNeeded,
       totalRollM2,
       suggestedPrices: {
-        min: buildTier(minMarkup),
-        recommended: buildTier(recMarkup),
-        premium: buildTier(premMarkup),
+        min: minTier,
+        recommended: recTier,
+        premium: premTier,
       },
     };
   }
@@ -404,17 +422,24 @@ export function calculateOrderCost(params: {
   const totalCost = Number((materialCost + clickCost + machineLaborCost).toFixed(2));
   const unitCost = quantity > 0 ? Number((totalCost / quantity).toFixed(3)) : 0;
 
-  const buildTier = (markup: number) => {
+  const buildTier = (markup: number): PriceTier => {
     const raw = totalCost * (1 + markup / 100);
-    const price = Math.max(15, Math.ceil(raw));
+    const basePrice = Math.max(15, Math.ceil(raw));
+    // Custo com tinta é 3% do valor total do pedido (ex: R$ 100 -> + R$ 3 = R$ 103)
+    const inkCost = Number((basePrice * 0.03).toFixed(2));
+    const price = Number((basePrice + inkCost).toFixed(2));
     const unitPrice = quantity > 0 ? Number((price / quantity).toFixed(3)) : 0;
     const profit = Number((price - totalCost).toFixed(2));
-    return { markup, price, unitPrice, profit };
+    return { markup, basePrice, inkCost, price, unitPrice, profit };
   };
 
   const recMarkup = Math.max(40, markupPercent);
   const minMarkup = Math.max(25, Math.round(recMarkup * 0.7));
   const premMarkup = Math.round(recMarkup * 1.4);
+
+  const minTier = buildTier(minMarkup);
+  const recTier = buildTier(recMarkup);
+  const premTier = buildTier(premMarkup);
 
   return {
     sheetType,
@@ -426,13 +451,14 @@ export function calculateOrderCost(params: {
     materialCost: Number(materialCost.toFixed(2)),
     clickCost: Number(clickCost.toFixed(2)),
     machineLaborCost: Number(machineLaborCost.toFixed(2)),
+    inkCost: recTier.inkCost,
     totalCost,
     unitCost,
     isRoll: false,
     suggestedPrices: {
-      min: buildTier(minMarkup),
-      recommended: buildTier(recMarkup),
-      premium: buildTier(premMarkup),
+      min: minTier,
+      recommended: recTier,
+      premium: premTier,
     },
   };
 }
@@ -473,6 +499,8 @@ export function generateWhatsAppMessage(params: {
   materialName: string;
   totalPrice: number;
   unitPrice: number;
+  basePrice?: number;
+  inkCost?: number;
   hasDelivery?: boolean;
   deliveryFee?: number;
   deliveryAddress?: string;
@@ -488,11 +516,20 @@ export function generateWhatsAppMessage(params: {
     materialName,
     totalPrice,
     unitPrice,
+    basePrice,
+    inkCost,
     hasDelivery,
     deliveryFee = 7,
     deliveryAddress,
     notes,
   } = params;
+
+  const resolvedInkCost =
+    inkCost !== undefined
+      ? inkCost
+      : basePrice !== undefined
+        ? Number((basePrice * 0.03).toFixed(2))
+        : 0;
 
   return (
     `*Orçamento Gráfico - PrintFlow*\n\n` +
@@ -501,6 +538,9 @@ export function generateWhatsAppMessage(params: {
     `🔢 *Quantidade:* ${quantity.toLocaleString('pt-BR')} unidades\n` +
     `📏 *Tamanho / Formato:* ${widthCm} x ${heightCm} cm (${printSides})\n` +
     `📄 *Papel / Material:* ${materialName}\n` +
+    (resolvedInkCost > 0
+      ? `💧 *Custo com Tinta (3%):* ${formatBRL(resolvedInkCost)}\n`
+      : '') +
     (hasDelivery
       ? `🚚 *Entrega:* Sim (+ ${formatBRL(deliveryFee)})${deliveryAddress ? `\n📍 *Endereço:* ${deliveryAddress}` : ''}\n`
       : `🏪 *Retirada:* No balcão da gráfica\n`) +

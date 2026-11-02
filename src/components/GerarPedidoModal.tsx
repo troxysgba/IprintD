@@ -187,13 +187,22 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
   const basePrice = useMemo(() => {
     if (customFinalPrice !== null) return customFinalPrice;
-    return costResult?.suggestedPrices.recommended.price || 0;
+    return (
+      costResult?.suggestedPrices.recommended.basePrice ??
+      costResult?.suggestedPrices.recommended.price ??
+      0
+    );
   }, [customFinalPrice, costResult]);
+
+  // Custo da tinta calculado em 3% do valor total do pedido (ex: R$ 100 -> R$ 103)
+  const inkCost = useMemo(() => {
+    return Number((basePrice * 0.03).toFixed(2));
+  }, [basePrice]);
 
   // Se for para entregar, acrescenta R$ 7 reais no preço final do produto
   const activeTotalPrice = useMemo(() => {
-    return Number((basePrice + (hasDelivery ? 7 : 0)).toFixed(2));
-  }, [basePrice, hasDelivery]);
+    return Number((basePrice + inkCost + (hasDelivery ? 7 : 0)).toFixed(2));
+  }, [basePrice, inkCost, hasDelivery]);
 
   const activeUnitPrice = useMemo(() => {
     return quantity > 0 ? Number((activeTotalPrice / quantity).toFixed(3)) : 0;
@@ -237,6 +246,8 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       materialName: selectedMaterial?.name || 'Padrão',
       totalPrice: activeTotalPrice,
       unitPrice: activeUnitPrice,
+      basePrice,
+      inkCost,
       hasDelivery,
       deliveryFee: 7,
       deliveryAddress,
@@ -252,6 +263,8 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
     selectedMaterial,
     activeTotalPrice,
     activeUnitPrice,
+    basePrice,
+    inkCost,
     hasDelivery,
     deliveryAddress,
     notes,
@@ -372,6 +385,7 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       materialCost: costResult?.materialCost || 0,
       clickCost: costResult?.clickCost || 0,
       machineLaborCost: costResult?.machineLaborCost || 0,
+      inkCost,
       totalCost: costResult?.totalCost || 0,
       suggestedPrice: costResult?.suggestedPrices.recommended.price || activeTotalPrice,
       finalPrice: activeTotalPrice,
@@ -958,6 +972,17 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                   </div>
                 )}
 
+                {/* Custo com Tinta (3% do pedido) */}
+                <div className="flex items-center justify-between text-xs text-sky-950 bg-sky-50 px-2.5 py-1.5 rounded-lg border border-sky-200">
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                    Custo de Tinta (3% do pedido):
+                  </span>
+                  <span className="font-mono font-black text-sky-900">
+                    +{formatBRL(inkCost)}
+                  </span>
+                </div>
+
                 {/* Indicador de Entrega na Composição do Preço */}
                 {hasDelivery && (
                   <div className="flex items-center justify-between text-xs text-amber-900 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200">
@@ -969,28 +994,55 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                   </div>
                 )}
 
-                {/* Preço de Venda Final Customizável */}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 block">
-                      Valor Final da Venda:
-                    </label>
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      Unitário: {formatBRL(activeUnitPrice)}
-                    </span>
+                {/* Preço de Venda Final Customizável com Cálculo de 3% Tinta */}
+                <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 block">
+                        Valor Base do Pedido:
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        Ex: R$ 100,00 gera +R$ 3,00 de tinta = R$ 103,00
+                      </span>
+                    </div>
+
+                    <div className="relative w-36">
+                      <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">
+                        R$
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={basePrice > 0 ? basePrice.toFixed(2) : ''}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setCustomFinalPrice(isNaN(val) ? 0 : val);
+                        }}
+                        className="w-full pl-8 pr-2 py-1.5 text-sm font-mono font-bold text-right bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-900"
+                        placeholder="0.00"
+                      />
+                    </div>
                   </div>
 
-                  <div className="relative w-36">
-                    <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">
-                      R$
-                    </span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={activeTotalPrice.toFixed(2)}
-                      onChange={(e) => setCustomFinalPrice(parseFloat(e.target.value) || 0)}
-                      className="w-full pl-8 pr-2 py-1.5 text-sm font-mono font-black text-right bg-amber-50 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-900"
-                    />
+                  <div className="flex items-center justify-between p-3 bg-slate-900 text-white rounded-xl shadow-xs">
+                    <div>
+                      <div className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                        Total Final a Cobrar:
+                      </div>
+                      <div className="text-[10px] text-slate-300 font-mono">
+                        Base ({formatBRL(basePrice)}) + Tinta 3% ({formatBRL(inkCost)})
+                        {hasDelivery ? ' + Entrega (R$ 7)' : ''}
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-xl font-black font-mono text-white tabular-nums">
+                        {formatBRL(activeTotalPrice)}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        Unitário: {formatBRL(activeUnitPrice)}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

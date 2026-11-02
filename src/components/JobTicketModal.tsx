@@ -1,6 +1,6 @@
 import React from 'react';
 import { Order } from '../types';
-import { formatDate } from '../utils/calculator';
+import { formatBRL, formatDate } from '../utils/calculator';
 import { Printer, X } from 'lucide-react';
 
 interface JobTicketModalProps {
@@ -172,6 +172,32 @@ export const JobTicketModal: React.FC<JobTicketModalProps> = ({ order, onClose }
                 <span className="font-bold">Instruções Técnicas:</span> {order.notes}
               </div>
             )}
+
+            {/* Financial and Production Details */}
+            <div className="bg-slate-50 border border-slate-200 rounded p-2 flex items-center justify-between text-[11px] font-mono">
+              <div>
+                <span className="text-slate-500 font-sans text-[10px] uppercase block">
+                  Valor & Custos
+                </span>
+                <span className="font-bold text-slate-900">
+                  Total: {formatBRL(order.finalPrice)}
+                </span>
+                <span className="text-sky-700 ml-2 font-semibold">
+                  · Tinta (3%): {formatBRL(order.inkCost ?? Number(((order.finalPrice - (order.hasDelivery ? 7 : 0)) * 0.03 / 1.03).toFixed(2)))}
+                </span>
+                {order.hasDelivery && (
+                  <span className="text-amber-800 ml-2 font-semibold">
+                    · Entrega (+R$ 7,00)
+                  </span>
+                )}
+              </div>
+              <div className="text-right">
+                <span className="text-slate-500 font-sans text-[10px] uppercase block">
+                  Unitário
+                </span>
+                <span className="font-bold text-slate-900">{formatBRL(order.unitPrice)}/un</span>
+              </div>
+            </div>
           </div>
 
           {/* Operator Signoff & Quality Assurance */}

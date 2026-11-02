@@ -47,6 +47,7 @@ export interface Order {
   materialCost: number;
   clickCost: number;
   machineLaborCost: number;
+  inkCost?: number; // Custo com tinta calculado em 3% do valor do pedido
   totalCost: number;
   suggestedPrice: number;
   finalPrice: number;

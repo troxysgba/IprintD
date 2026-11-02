@@ -91,6 +91,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       materialName: order.materialName,
       totalPrice: order.finalPrice,
       unitPrice: order.unitPrice,
+      inkCost: order.inkCost,
+      hasDelivery: order.hasDelivery,
+      deliveryFee: order.deliveryFee || 7,
+      deliveryAddress: order.deliveryAddress,
       notes: order.notes,
     });
     const link = generateWhatsAppLink(order.clientPhone, text);
@@ -283,6 +287,9 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                           🚚 Entrega (+R$ 7)
                         </span>
                       )}
+                      <span className="bg-sky-50 text-sky-900 border border-sky-200 px-1.5 py-0.2 rounded font-bold text-[10px]">
+                        💧 Tinta 3% (+{formatBRL(ord.inkCost ?? Number(((ord.finalPrice - (ord.hasDelivery ? 7 : 0)) * 0.03 / 1.03).toFixed(2)))})
+                      </span>
                       <span>·</span>
                       <span>Material: {ord.materialName}</span>
                       <span>·</span>
