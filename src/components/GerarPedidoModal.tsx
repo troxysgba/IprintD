@@ -278,7 +278,14 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
   const openWhatsAppDirect = () => {
     const link = generateWhatsAppLink(clientPhone, whatsAppText);
-    window.open(link, '_blank');
+    try {
+      const opened = window.open(link, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        window.location.href = link;
+      }
+    } catch {
+      window.location.href = link;
+    }
   };
 
   // Preset Handlers
