@@ -1,16 +1,18 @@
-import { Equipment, Material, Order, StockMovement } from '../types';
+import { Equipment, Material, Order, QuickProductPreset, StockMovement } from '../types';
 import {
   INITIAL_EQUIPMENTS,
   INITIAL_MATERIALS,
   INITIAL_ORDERS,
+  INITIAL_PRESETS,
   INITIAL_STOCK_MOVEMENTS,
 } from '../utils/mockData';
 
 const KEYS = {
   ORDERS: 'printflow_orders_v2',
   MATERIALS: 'printflow_materials_v2',
-  EQUIPMENTS: 'printflow_equipments_v2',
+  EQUIPMENTS: 'printflow_equipments_v3',
   MOVEMENTS: 'printflow_movements_v2',
+  PRESETS: 'printflow_presets_v2',
 };
 
 function load<T>(key: string, fallback: T): T {
@@ -48,7 +50,20 @@ export const StorageService = {
   },
 
   getEquipments(): Equipment[] {
-    return load<Equipment[]>(KEYS.EQUIPMENTS, INITIAL_EQUIPMENTS);
+    const loaded = load<Equipment[]>(KEYS.EQUIPMENTS, INITIAL_EQUIPMENTS);
+    // Garante que qualquer resquício de máquinas antigas seja substituído pelas novas impressoras jato de tinta
+    const hasOld = loaded.some(
+      (e) =>
+        e.id === 'eq_ricoh_c5300' ||
+        e.id === 'eq_bizhub_mono' ||
+        e.id === 'eq_plotter_epson' ||
+        e.id === 'eq_guilhotina'
+    );
+    if (hasOld || loaded.length === 0) {
+      save(KEYS.EQUIPMENTS, INITIAL_EQUIPMENTS);
+      return INITIAL_EQUIPMENTS;
+    }
+    return loaded;
   },
   saveEquipments(equipments: Equipment[]): void {
     save(KEYS.EQUIPMENTS, equipments);
@@ -59,6 +74,22 @@ export const StorageService = {
   },
   saveStockMovements(movements: StockMovement[]): void {
     save(KEYS.MOVEMENTS, movements);
+  },
+
+  getPresets(): QuickProductPreset[] {
+    const loaded = load<QuickProductPreset[]>(KEYS.PRESETS, INITIAL_PRESETS);
+    return loaded.map((p) => {
+      if (!p.equipmentId) {
+        return {
+          ...p,
+          equipmentId: p.isPlotter ? 'eq_l3250' : 'eq_l4260',
+        };
+      }
+      return p;
+    });
+  },
+  savePresets(presets: QuickProductPreset[]): void {
+    save(KEYS.PRESETS, presets);
   },
 
   recordStockMovement(

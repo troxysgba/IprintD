@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Equipment, Material, Order } from '../types';
+import { Equipment, Material, Order, QuickProductPreset } from '../types';
 import {
   calculateOrderCost,
   formatBRL,
@@ -13,8 +13,12 @@ import {
   ExternalLink,
   Layers,
   MessageSquare,
+  Pencil,
+  Plus,
   Printer,
+  SlidersHorizontal,
   Sparkles,
+  Trash2,
   User,
   X,
 } from 'lucide-react';
@@ -22,83 +26,21 @@ import {
 interface GerarPedidoModalProps {
   materials: Material[];
   equipments: Equipment[];
+  presets: QuickProductPreset[];
+  onAddPreset: (preset: QuickProductPreset) => void;
+  onUpdatePreset: (preset: QuickProductPreset) => void;
+  onDeletePreset: (presetId: string) => void;
   onSaveOrder: (order: Order) => void;
   onClose: () => void;
 }
 
-interface QuickProductPreset {
-  label: string;
-  name: string;
-  w: number; // em cm
-  h: number; // em cm
-  sides: '4x0' | '4x4' | '1x0' | '1x1';
-  qty: number;
-  materialKeyword: string;
-  isPlotter?: boolean;
-}
-
-const PRESETS: QuickProductPreset[] = [
-  {
-    label: 'Cartão 9x5 cm',
-    name: 'Cartão de Visita 9x5 cm Couché 300g',
-    w: 9,
-    h: 5,
-    sides: '4x4',
-    qty: 1000,
-    materialKeyword: '300g',
-  },
-  {
-    label: 'Panfleto 15x21 cm',
-    name: 'Panfleto 15x21 cm (A5) Couché 150g',
-    w: 14.8,
-    h: 21,
-    sides: '4x0',
-    qty: 2500,
-    materialKeyword: '150g',
-  },
-  {
-    label: 'Folder 30x21 cm',
-    name: 'Folder 30x21 cm (A4) 2 Dobras Couché 150g',
-    w: 29.7,
-    h: 21,
-    sides: '4x4',
-    qty: 500,
-    materialKeyword: '150g',
-  },
-  {
-    label: 'Banner 100x150 cm',
-    name: 'Banner Lona 100x150 cm c/ Bastão e Ilhós',
-    w: 100,
-    h: 150,
-    sides: '4x0',
-    qty: 1,
-    materialKeyword: 'Lona',
-    isPlotter: true,
-  },
-  {
-    label: 'Adesivo 5x5 cm',
-    name: 'Adesivo Vinil 5x5 cm Meio-Corte',
-    w: 5,
-    h: 5,
-    sides: '4x0',
-    qty: 500,
-    materialKeyword: 'Vinil',
-    isPlotter: true,
-  },
-  {
-    label: 'Receituário 15x21 cm',
-    name: 'Receituário 15x21 cm Offset 90g Blocado',
-    w: 14.8,
-    h: 21,
-    sides: '1x0',
-    qty: 1000,
-    materialKeyword: 'Offset',
-  },
-];
-
 export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
   materials,
   equipments,
+  presets,
+  onAddPreset,
+  onUpdatePreset,
+  onDeletePreset,
   onSaveOrder,
   onClose,
 }) => {
@@ -128,6 +70,36 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
   // Copy feedback
   const [copied, setCopied] = useState(false);
+
+  // State for Managing Quick Presets Modals
+  const [isNewPresetOpen, setIsNewPresetOpen] = useState(false);
+  const [editingPreset, setEditingPreset] = useState<QuickProductPreset | null>(null);
+  const [presetToDelete, setPresetToDelete] = useState<QuickProductPreset | null>(null);
+  const [isManagePresetsOpen, setIsManagePresetsOpen] = useState(false);
+
+  // Form state for New Preset
+  const [newPresetLabel, setNewPresetLabel] = useState('');
+  const [newPresetName, setNewPresetName] = useState('');
+  const [newPresetWidthCm, setNewPresetWidthCm] = useState<number>(9);
+  const [newPresetHeightCm, setNewPresetHeightCm] = useState<number>(5);
+  const [newPresetSides, setNewPresetSides] = useState<'4x0' | '4x4' | '1x0' | '1x1'>('4x4');
+  const [newPresetQty, setNewPresetQty] = useState<number>(1000);
+  const [newPresetMaterialKeyword, setNewPresetMaterialKeyword] = useState('300g');
+  const [newPresetEquipmentId, setNewPresetEquipmentId] = useState<string>(
+    equipments[0]?.id || ''
+  );
+
+  // Form state for Editing Preset
+  const [editPresetLabel, setEditPresetLabel] = useState('');
+  const [editPresetName, setEditPresetName] = useState('');
+  const [editPresetWidthCm, setEditPresetWidthCm] = useState<number>(9);
+  const [editPresetHeightCm, setEditPresetHeightCm] = useState<number>(5);
+  const [editPresetSides, setEditPresetSides] = useState<'4x0' | '4x4' | '1x0' | '1x1'>('4x4');
+  const [editPresetQty, setEditPresetQty] = useState<number>(1000);
+  const [editPresetMaterialKeyword, setEditPresetMaterialKeyword] = useState('300g');
+  const [editPresetEquipmentId, setEditPresetEquipmentId] = useState<string>(
+    equipments[0]?.id || ''
+  );
 
   const selectedMaterial = useMemo(
     () => materials.find((m) => m.id === selectedMaterialId) || materials[0],
@@ -177,28 +149,29 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
     return quantity > 0 ? activeTotalPrice / quantity : 0;
   }, [activeTotalPrice, quantity]);
 
-  // Apply preset
+  // Apply preset to current order
   const applyPreset = (preset: QuickProductPreset) => {
     setProductName(preset.name);
-    setWidthCm(preset.w);
-    setHeightCm(preset.h);
-    setPrintSides(preset.sides);
-    setQuantity(preset.qty);
+    setWidthCm(preset.widthCm);
+    setHeightCm(preset.heightCm);
+    setPrintSides(preset.printSides);
+    setQuantity(preset.quantity);
     setCustomFinalPrice(null);
 
-    // Auto-select material
+    // Auto-select material based on keyword
     const matchedMat = materials.find((m) =>
       m.name.toLowerCase().includes(preset.materialKeyword.toLowerCase())
     );
     if (matchedMat) setSelectedMaterialId(matchedMat.id);
 
-    // Auto-select equipment
-    if (preset.isPlotter) {
+    // Auto-select equipment based on preset equipmentId or fallback
+    if (preset.equipmentId && equipments.some((e) => e.id === preset.equipmentId)) {
+      setSelectedEquipmentId(preset.equipmentId);
+    } else if (preset.isPlotter) {
       const plotter = equipments.find((e) => e.category === 'plotter');
       if (plotter) setSelectedEquipmentId(plotter.id);
-    } else {
-      const laser = equipments.find((e) => e.category === 'laser');
-      if (laser) setSelectedEquipmentId(laser.id);
+    } else if (equipments[0]) {
+      setSelectedEquipmentId(equipments[0].id);
     }
   };
 
@@ -240,7 +213,77 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
     window.open(link, '_blank');
   };
 
-  // Save handler
+  // Preset Handlers
+  const handleStartEditPreset = (preset: QuickProductPreset) => {
+    setEditingPreset(preset);
+    setEditPresetLabel(preset.label);
+    setEditPresetName(preset.name);
+    setEditPresetWidthCm(preset.widthCm);
+    setEditPresetHeightCm(preset.heightCm);
+    setEditPresetSides(preset.printSides);
+    setEditPresetQty(preset.quantity);
+    setEditPresetMaterialKeyword(preset.materialKeyword);
+    setEditPresetEquipmentId(preset.equipmentId || equipments[0]?.id || '');
+  };
+
+  const handleSaveNewPreset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPresetLabel.trim() || !newPresetName.trim()) return;
+
+    const chosenEqId = newPresetEquipmentId || equipments[0]?.id || '';
+    const selectedEq = equipments.find((eq) => eq.id === chosenEqId);
+
+    const newPreset: QuickProductPreset = {
+      id: `preset_${Date.now()}`,
+      label: newPresetLabel.trim(),
+      name: newPresetName.trim(),
+      widthCm: Number(newPresetWidthCm) || 9,
+      heightCm: Number(newPresetHeightCm) || 5,
+      printSides: newPresetSides,
+      quantity: Number(newPresetQty) || 1000,
+      materialKeyword: newPresetMaterialKeyword.trim() || 'Couché',
+      equipmentId: chosenEqId,
+      isPlotter: selectedEq?.category === 'plotter',
+    };
+
+    onAddPreset(newPreset);
+    setIsNewPresetOpen(false);
+    setNewPresetLabel('');
+    setNewPresetName('');
+  };
+
+  const handleSaveEditPreset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPreset || !editPresetLabel.trim() || !editPresetName.trim()) return;
+
+    const chosenEqId = editPresetEquipmentId || equipments[0]?.id || '';
+    const selectedEq = equipments.find((eq) => eq.id === chosenEqId);
+
+    const updated: QuickProductPreset = {
+      ...editingPreset,
+      label: editPresetLabel.trim(),
+      name: editPresetName.trim(),
+      widthCm: Number(editPresetWidthCm) || 9,
+      heightCm: Number(editPresetHeightCm) || 5,
+      printSides: editPresetSides,
+      quantity: Number(editPresetQty) || 1000,
+      materialKeyword: editPresetMaterialKeyword.trim() || 'Couché',
+      equipmentId: chosenEqId,
+      isPlotter: selectedEq?.category === 'plotter',
+    };
+
+    onUpdatePreset(updated);
+    setEditingPreset(null);
+  };
+
+  const handleConfirmDeletePreset = () => {
+    if (presetToDelete) {
+      onDeletePreset(presetToDelete.id);
+      setPresetToDelete(null);
+    }
+  };
+
+  // Save handler for Order / Budget
   const handleSave = (type: 'pedido' | 'orcamento') => {
     const prefix = type === 'pedido' ? 'OS' : 'ORC';
     const randomCode = `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -312,21 +355,81 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
         {/* Modal Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
-          {/* Quick Presets in CM */}
-          <div>
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-              Modelos Rápidos em Centímetros (1-Clique):
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {PRESETS.map((p) => (
+          {/* Quick Presets Section in CM with Add, Edit and Delete */}
+          <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Modelos Rápidos (1-Clique)
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold">
+                  {presets.length}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
                 <button
-                  key={p.label}
                   type="button"
-                  onClick={() => applyPreset(p)}
-                  className="px-2.5 py-1 text-xs font-semibold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 hover:border-amber-300 rounded-lg transition-all cursor-pointer"
+                  onClick={() => setIsManagePresetsOpen(true)}
+                  className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                  title="Gerenciar lista de modelos rápidos"
                 >
-                  {p.label}
+                  <SlidersHorizontal className="w-3 h-3 text-slate-500" />
+                  <span>Gerenciar</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setIsNewPresetOpen(true)}
+                  className="px-2.5 py-1 text-[11px] font-bold text-amber-950 bg-amber-400 hover:bg-amber-300 rounded-lg shadow-2xs transition-colors cursor-pointer flex items-center gap-1"
+                  title="Cadastrar novo modelo rápido"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>+ Novo Modelo</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Presets Badges with 1-Click apply, inline Edit and Delete */}
+            <div className="flex flex-wrap gap-1.5">
+              {presets.map((p) => (
+                <div
+                  key={p.id}
+                  className="group inline-flex items-center bg-white border border-slate-200 hover:border-amber-400 rounded-lg overflow-hidden shadow-2xs transition-all"
+                >
+                  <button
+                    type="button"
+                    onClick={() => applyPreset(p)}
+                    className="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-amber-950 hover:bg-amber-50/80 transition-colors cursor-pointer text-left flex items-center gap-1"
+                    title={`Aplicar ${p.name} (${p.widthCm}x${p.heightCm} cm)`}
+                  >
+                    <span>{p.label}</span>
+                  </button>
+                  <div className="flex items-center border-l border-slate-100 bg-slate-50/70 px-1 py-1 gap-0.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStartEditPreset(p);
+                      }}
+                      className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-100/60 rounded cursor-pointer transition-colors"
+                      title={`Editar modelo "${p.label}"`}
+                    >
+                      <Pencil className="w-2.5 h-2.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPresetToDelete(p);
+                      }}
+                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-100/60 rounded cursor-pointer transition-colors"
+                      title={`Excluir modelo "${p.label}"`}
+                    >
+                      <Trash2 className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -374,39 +477,43 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                 </div>
               </div>
 
-              {/* 2. Produto, Medidas em Centímetros e Quantidade */}
+              {/* 2. Especificação do Produto em Centímetros (cm) */}
               <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-amber-600" />
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    2. Produto & Medidas (em Centímetros - cm)
-                  </h3>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-amber-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      2. Especificações do Trabalho
+                    </h3>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Medidas em cm
+                  </span>
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Descrição do Produto
+                    Descrição do Item
                   </label>
                   <input
                     type="text"
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
-                    placeholder="Ex: Cartão de Visita 9x5 cm Couché 300g"
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Tiragem (Qtd)
+                      Quantidade
                     </label>
                     <input
                       type="number"
                       min="1"
                       value={quantity}
-                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full px-3 py-2 text-sm font-mono font-bold bg-white border border-slate-300 rounded-lg"
+                      onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                      className="w-full px-3 py-1.5 text-sm font-mono font-bold bg-white border border-slate-300 rounded-lg text-slate-900"
                     />
                   </div>
 
@@ -419,8 +526,8 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                       step="0.1"
                       min="1"
                       value={widthCm}
-                      onChange={(e) => setWidthCm(Math.max(0.5, parseFloat(e.target.value) || 0.5))}
-                      className="w-full px-3 py-2 text-sm font-mono font-bold bg-white border border-slate-300 rounded-lg"
+                      onChange={(e) => setWidthCm(parseFloat(e.target.value) || 1)}
+                      className="w-full px-3 py-1.5 text-sm font-mono bg-white border border-slate-300 rounded-lg"
                     />
                   </div>
 
@@ -433,216 +540,248 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                       step="0.1"
                       min="1"
                       value={heightCm}
-                      onChange={(e) => setHeightCm(Math.max(0.5, parseFloat(e.target.value) || 0.5))}
-                      className="w-full px-3 py-2 text-sm font-mono font-bold bg-white border border-slate-300 rounded-lg"
+                      onChange={(e) => setHeightCm(parseFloat(e.target.value) || 1)}
+                      className="w-full px-3 py-1.5 text-sm font-mono bg-white border border-slate-300 rounded-lg"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Cores
+                      Cores / Lados
                     </label>
                     <select
                       value={printSides}
                       onChange={(e) => setPrintSides(e.target.value as any)}
-                      className="w-full px-2 py-2 text-xs font-semibold bg-white border border-slate-300 rounded-lg"
+                      className="w-full px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg"
                     >
-                      <option value="4x0">4x0 (Frente Color)</option>
-                      <option value="4x4">4x4 (Frente/Verso)</option>
-                      <option value="1x0">1x0 (Frente PB)</option>
-                      <option value="1x1">1x1 (Frente/Verso PB)</option>
+                      <option value="4x4">4x4 (Frente e Verso Color)</option>
+                      <option value="4x0">4x0 (Só Frente Color)</option>
+                      <option value="1x1">1x1 (Frente e Verso P&B)</option>
+                      <option value="1x0">1x0 (Só Frente P&B)</option>
                     </select>
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Observações de Acabamento / Produção
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Laminação fosca frente e verso, refile e cantos arredondados..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg"
+                  />
+                </div>
               </div>
 
-              {/* 3. Adicionar Material e Máquina */}
+              {/* 3. Matéria-Prima e Equipamento */}
               <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex items-center gap-2">
                   <Printer className="w-4 h-4 text-amber-600" />
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    3. Matéria-Prima & Máquina Utilizada
+                    3. Matéria-Prima & Equipamento
                   </h3>
                 </div>
 
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Material / Papel / Substrato
+                      Papel / Substrato
                     </label>
                     <select
                       value={selectedMaterialId}
                       onChange={(e) => setSelectedMaterialId(e.target.value)}
-                      className="w-full px-3 py-2 text-xs font-medium bg-white border border-slate-300 rounded-lg"
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20"
                     >
                       {materials.map((m) => (
                         <option key={m.id} value={m.id}>
-                          {m.name} — Custo: {formatBRL(m.costPerUnit)}/{m.unit} (Estoque: {m.currentStock} {m.unit})
+                          {m.name} ({m.widthCm && m.heightCm ? `${m.widthCm}x${m.heightCm} cm - ` : ''}
+                          {formatBRL(m.costPerUnit)}/{m.unit})
                         </option>
                       ))}
                     </select>
+                    {selectedMaterial && (
+                      <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+                        <span>
+                          Saldo em estoque: {selectedMaterial.currentStock} {selectedMaterial.unit}s
+                        </span>
+                        {selectedMaterial.currentStock <= selectedMaterial.minStock && (
+                          <span className="text-amber-700 font-bold">Estoque Baixo!</span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Máquina que vai produzir
+                      Equipamento de Impressão
                     </label>
                     <select
                       value={selectedEquipmentId}
                       onChange={(e) => setSelectedEquipmentId(e.target.value)}
-                      className="w-full px-3 py-2 text-xs font-medium bg-white border border-slate-300 rounded-lg"
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20"
                     >
-                      {equipments.map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {e.name} — Clique: Color {formatBRL(e.clickCostColor)} | PB {formatBRL(e.clickCostPB)}
+                      {equipments.map((eq) => (
+                        <option key={eq.id} value={eq.id}>
+                          {eq.name}
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Observações Técnicas / Acabamento
-                    </label>
-                    <input
-                      type="text"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Ex: Plastificação brilhante, corte reto, furos..."
-                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg"
-                    />
+                    {selectedEquipment && (
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        Custo clique color: {formatBRL(selectedEquipment.clickCostColor)} · Velocidade: {selectedEquipment.speedPerHour} un/h
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Aproveitamento em Centímetros */}
+                {costResult && !isPlotter && (
+                  <div className="bg-amber-50/70 p-3 rounded-lg border border-amber-200 text-xs flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-amber-900">
+                        {costResult.itemsPerSheet} peças por folha SRA3
+                      </span>
+                      <span className="text-amber-700 ml-1">
+                        (Orientação {costResult.nestingOrientation})
+                      </span>
+                    </div>
+                    <div className="text-amber-900 font-mono font-bold">
+                      {costResult.totalSheetsToConsume} folhas necessárias
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Right Column: Preços Sugeridos & WhatsApp (5 cols) */}
             <div className="lg:col-span-5 space-y-5">
-              {/* Preços Sugeridos */}
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Preços Sugeridos
-                    </h3>
-                  </div>
-                  {costResult && (
-                    <span className="text-[11px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                      Custo: {formatBRL(costResult.totalCost)}
-                    </span>
-                  )}
+              {/* Preços Sugeridos em Tempo Real */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Preços Sugeridos</span>
+                  </h3>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    Custo Total: {formatBRL(costResult?.totalCost || 0)}
+                  </span>
                 </div>
 
-                {/* 3 Clickable Pricing Tiers */}
                 {costResult && (
                   <div className="grid grid-cols-3 gap-2">
+                    {/* Econômico */}
                     <button
                       type="button"
                       onClick={() => {
-                        setMarkupPercent(costResult.suggestedPrices.min.markup);
-                        setCustomFinalPrice(costResult.suggestedPrices.min.price);
+                        setMarkupPercent(35);
+                        setCustomFinalPrice(null);
                       }}
-                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
-                        activeTotalPrice === costResult.suggestedPrices.min.price
-                          ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20'
-                          : 'border-slate-200 hover:border-slate-300'
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        markupPercent === 35 && customFinalPrice === null
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 hover:border-slate-300 bg-slate-50/60'
                       }`}
                     >
-                      <div className="text-[10px] text-slate-500 font-bold uppercase">
+                      <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">
                         Econômico
                       </div>
-                      <div className="text-xs font-bold font-mono text-slate-900">
+                      <div className="text-sm font-black font-mono mt-0.5">
                         {formatBRL(costResult.suggestedPrices.min.price)}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        +{costResult.suggestedPrices.min.markup}%
+                      <div className="text-[10px] opacity-75 mt-0.5">
+                        {formatBRL(costResult.suggestedPrices.min.unitPrice)}/un
                       </div>
                     </button>
 
+                    {/* Recomendado */}
                     <button
                       type="button"
                       onClick={() => {
-                        setMarkupPercent(costResult.suggestedPrices.recommended.markup);
-                        setCustomFinalPrice(costResult.suggestedPrices.recommended.price);
+                        setMarkupPercent(70);
+                        setCustomFinalPrice(null);
                       }}
-                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
-                        activeTotalPrice === costResult.suggestedPrices.recommended.price
-                          ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20'
-                          : 'border-slate-200 hover:border-slate-300'
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
+                        markupPercent === 70 && customFinalPrice === null
+                          ? 'border-amber-500 bg-amber-500 text-slate-950 font-bold'
+                          : 'border-amber-200 hover:border-amber-400 bg-amber-50/50'
                       }`}
                     >
-                      <div className="text-[10px] text-amber-700 font-bold uppercase flex items-center gap-0.5">
-                        <Sparkles className="w-2.5 h-2.5" /> Recomendado
+                      <div className="text-[10px] font-black uppercase tracking-wider text-amber-900">
+                        Recomendado
                       </div>
-                      <div className="text-xs font-bold font-mono text-slate-900">
+                      <div className="text-sm font-black font-mono mt-0.5">
                         {formatBRL(costResult.suggestedPrices.recommended.price)}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        +{costResult.suggestedPrices.recommended.markup}%
+                      <div className="text-[10px] opacity-80 mt-0.5">
+                        {formatBRL(costResult.suggestedPrices.recommended.unitPrice)}/un
                       </div>
                     </button>
 
+                    {/* Alta Margem */}
                     <button
                       type="button"
                       onClick={() => {
-                        setMarkupPercent(costResult.suggestedPrices.premium.markup);
-                        setCustomFinalPrice(costResult.suggestedPrices.premium.price);
+                        setMarkupPercent(120);
+                        setCustomFinalPrice(null);
                       }}
-                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
-                        activeTotalPrice === costResult.suggestedPrices.premium.price
-                          ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20'
-                          : 'border-slate-200 hover:border-slate-300'
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        markupPercent === 120 && customFinalPrice === null
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 hover:border-slate-300 bg-slate-50/60'
                       }`}
                     >
-                      <div className="text-[10px] text-slate-500 font-bold uppercase">
+                      <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">
                         Alta Margem
                       </div>
-                      <div className="text-xs font-bold font-mono text-slate-900">
+                      <div className="text-sm font-black font-mono mt-0.5">
                         {formatBRL(costResult.suggestedPrices.premium.price)}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        +{costResult.suggestedPrices.premium.markup}%
+                      <div className="text-[10px] opacity-75 mt-0.5">
+                        {formatBRL(costResult.suggestedPrices.premium.unitPrice)}/un
                       </div>
                     </button>
                   </div>
                 )}
 
-                {/* Final Price Highlight / Custom Input */}
-                <div className="bg-slate-900 text-white p-4 rounded-xl space-y-2">
-                  <div className="flex justify-between items-center text-xs text-slate-300">
-                    <span className="font-semibold uppercase tracking-wider">Preço de Venda Final:</span>
-                    <span className="font-mono text-emerald-400 text-[11px]">
-                      Lucro: {formatBRL(activeTotalPrice - (costResult?.totalCost || 0))}
+                {/* Preço de Venda Final Customizável */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-800 block">
+                      Valor Final da Venda:
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Unitário: {formatBRL(activeUnitPrice)}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl font-bold font-mono text-amber-400">R$</span>
+                  <div className="relative w-36">
+                    <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">
+                      R$
+                    </span>
                     <input
                       type="number"
-                      step="1"
-                      value={activeTotalPrice}
+                      step="0.01"
+                      value={activeTotalPrice.toFixed(2)}
                       onChange={(e) => setCustomFinalPrice(parseFloat(e.target.value) || 0)}
-                      className="text-2xl font-black font-mono bg-transparent text-white w-full border-b border-slate-700 focus:border-amber-400 focus:outline-none"
+                      className="w-full pl-8 pr-2 py-1.5 text-sm font-mono font-black text-right bg-amber-50 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-900"
                     />
-                  </div>
-                  <div className="text-[11px] font-mono text-slate-400">
-                    Tamanho: {widthCm} x {heightCm} cm · Unitário: {formatBRL(activeUnitPrice)} / un
                   </div>
                 </div>
               </div>
 
-              {/* Gerar Orçamento para copiar e mandar pelo WhatsApp */}
-              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl space-y-3">
+              {/* Gerador de Orçamento para Copiar e Mandar pelo WhatsApp */}
+              <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/80 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-xs uppercase tracking-wider">
                     <MessageSquare className="w-4 h-4 text-emerald-600" />
                     <span>Orçamento para WhatsApp</span>
                   </div>
                   {copied && (
-                    <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" /> Copiado!
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Copiado!
                     </span>
                   )}
                 </div>
@@ -705,6 +844,457 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* SUB-MODAL 1: Adicionar Novo Modelo Rápido */}
+      {isNewPresetOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-amber-500" />
+                  <span>Novo Modelo Rápido</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Crie um botão de 1-clique com medidas em centímetros (cm).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewPresetOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveNewPreset} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">
+                  Rótulo do Botão *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Cartão 9x5 cm, Crachá 6x9 cm, Banner 80x120 cm"
+                  value={newPresetLabel}
+                  onChange={(e) => setNewPresetLabel(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">
+                  Nome Completo do Produto (OS / Orçamento) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Cartão de Visita 9x5 cm Couché 300g 4x4"
+                  value={newPresetName}
+                  onChange={(e) => setNewPresetName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Largura (cm)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.5"
+                    required
+                    value={newPresetWidthCm}
+                    onChange={(e) => setNewPresetWidthCm(parseFloat(e.target.value) || 1)}
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Altura (cm)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.5"
+                    required
+                    value={newPresetHeightCm}
+                    onChange={(e) => setNewPresetHeightCm(parseFloat(e.target.value) || 1)}
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Cores / Lados</label>
+                  <select
+                    value={newPresetSides}
+                    onChange={(e) => setNewPresetSides(e.target.value as any)}
+                    className="w-full px-3 py-2 font-semibold bg-slate-50 border border-slate-200 rounded-lg"
+                  >
+                    <option value="4x4">4x4 (Frente e Verso Color)</option>
+                    <option value="4x0">4x0 (Só Frente Color)</option>
+                    <option value="1x1">1x1 (Frente e Verso P&B)</option>
+                    <option value="1x0">1x0 (Só Frente P&B)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Tiragem Padrão</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newPresetQty}
+                    onChange={(e) => setNewPresetQty(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">
+                    Palavra-Chave do Material
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 300g, 150g, Lona, Vinil, Offset"
+                    value={newPresetMaterialKeyword}
+                    onChange={(e) => setNewPresetMaterialKeyword(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">
+                    Impressora / Equipamento *
+                  </label>
+                  <select
+                    value={newPresetEquipmentId}
+                    onChange={(e) => setNewPresetEquipmentId(e.target.value)}
+                    className="w-full px-3 py-2 font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
+                  >
+                    {equipments.map((eq) => (
+                      <option key={eq.id} value={eq.id}>
+                        {eq.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsNewPresetOpen(false)}
+                  className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Salvar Modelo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-MODAL 2: Editar Modelo Rápido */}
+      {editingPreset && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-amber-500" />
+                  <span>Editar Modelo Rápido</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Atualize as medidas em centímetros (cm), tiragem e vínculo de material.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingPreset(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditPreset} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">
+                  Rótulo do Botão *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editPresetLabel}
+                  onChange={(e) => setEditPresetLabel(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">
+                  Nome Completo do Produto (OS / Orçamento) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editPresetName}
+                  onChange={(e) => setEditPresetName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Largura (cm)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.5"
+                    required
+                    value={editPresetWidthCm}
+                    onChange={(e) => setEditPresetWidthCm(parseFloat(e.target.value) || 1)}
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Altura (cm)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.5"
+                    required
+                    value={editPresetHeightCm}
+                    onChange={(e) => setEditPresetHeightCm(parseFloat(e.target.value) || 1)}
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Cores / Lados</label>
+                  <select
+                    value={editPresetSides}
+                    onChange={(e) => setEditPresetSides(e.target.value as any)}
+                    className="w-full px-3 py-2 font-semibold bg-slate-50 border border-slate-200 rounded-lg"
+                  >
+                    <option value="4x4">4x4 (Frente e Verso Color)</option>
+                    <option value="4x0">4x0 (Só Frente Color)</option>
+                    <option value="1x1">1x1 (Frente e Verso P&B)</option>
+                    <option value="1x0">1x0 (Só Frente P&B)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Tiragem Padrão</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editPresetQty}
+                    onChange={(e) => setEditPresetQty(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">
+                    Palavra-Chave do Material
+                  </label>
+                  <input
+                    type="text"
+                    value={editPresetMaterialKeyword}
+                    onChange={(e) => setEditPresetMaterialKeyword(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">
+                    Impressora / Equipamento *
+                  </label>
+                  <select
+                    value={editPresetEquipmentId}
+                    onChange={(e) => setEditPresetEquipmentId(e.target.value)}
+                    className="w-full px-3 py-2 font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
+                  >
+                    {equipments.map((eq) => (
+                      <option key={eq.id} value={eq.id}>
+                        {eq.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingPreset(null)}
+                  className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-MODAL 3: Confirmação de Exclusão de Modelo Rápido */}
+      {presetToDelete && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center gap-3 text-rose-600 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Excluir Modelo?</h3>
+                <p className="text-xs text-slate-500">Remover botão de acesso rápido</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 my-4 text-xs space-y-1">
+              <div className="font-bold text-slate-900">{presetToDelete.label}</div>
+              <div className="text-slate-500 font-mono">
+                {presetToDelete.widthCm}x{presetToDelete.heightCm} cm · {presetToDelete.printSides} · {presetToDelete.quantity} un
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 mb-5">
+              Tem certeza de que deseja excluir o modelo "{presetToDelete.label}"? Ele não aparecerá mais nos atalhos de 1-clique.
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPresetToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeletePreset}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Sim, Excluir</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-MODAL 4: Gerenciar Todos os Modelos Rápidos */}
+      {isManagePresetsOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 shrink-0">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-amber-500" />
+                  <span>Gerenciar Modelos Rápidos</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Adicione novos produtos, altere medidas em centímetros (cm) ou exclua modelos existentes.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsNewPresetOpen(true)}
+                  className="px-3 py-1.5 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5 text-amber-400" />
+                  <span>+ Novo Modelo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsManagePresetsOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+              {presets.map((p) => {
+                const assignedEq = equipments.find((e) => e.id === p.equipmentId);
+                return (
+                  <div
+                    key={p.id}
+                    className="p-3.5 bg-slate-50 hover:bg-slate-100/70 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-slate-900 text-xs">{p.label}</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white text-slate-600 border border-slate-200">
+                          {p.widthCm} x {p.heightCm} cm
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
+                          {p.printSides}
+                        </span>
+                        <span className="text-[10px] font-medium text-sky-800 bg-sky-50 border border-sky-200/60 px-2 py-0.5 rounded">
+                          🖨️ {assignedEq ? assignedEq.name : 'Impressora Padrão'}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        {p.name} · Tiragem padrão: <span className="font-mono font-semibold">{p.quantity} un</span> · Material: {p.materialKeyword}
+                      </div>
+                    </div>
+
+                  <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleStartEditPreset(p)}
+                      className="px-2.5 py-1 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <Pencil className="w-3 h-3 text-amber-600" />
+                      <span>Editar</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPresetToDelete(p)}
+                      className="px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3 text-rose-600" />
+                      <span>Excluir</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 mt-4 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsManagePresetsOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
+              >
+                Concluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

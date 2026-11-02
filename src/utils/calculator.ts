@@ -72,6 +72,7 @@ export function calculateSheetNesting(
 }
 
 export interface CostCalculationResult {
+  nestingOrientation?: 'direta' | 'girada';
   itemsPerSheet: number;
   sheetsNeeded: number;
   wasteSheets: number;
@@ -121,6 +122,7 @@ export function calculateOrderCost(params: {
   let totalSheetsToConsume = 0;
   let materialCost = 0;
   let clickCost = 0;
+  let nestingOrientation: 'direta' | 'girada' | undefined = undefined;
 
   if (isPlotterM2) {
     // Cálculo em metros quadrados a partir de centímetros: (L cm / 100) * (A cm / 100)
@@ -135,6 +137,7 @@ export function calculateOrderCost(params: {
     clickCost = billedAreaM2 * (clickCostColor > 0 ? clickCostColor : 14.0);
   } else {
     const nesting = calculateSheetNesting(widthCm, heightCm);
+    nestingOrientation = nesting.orientation;
     itemsPerSheet = nesting.itemsPerSheet;
     sheetsNeeded = Math.ceil(quantity / itemsPerSheet);
     wasteSheets = Math.max(2, Math.ceil(sheetsNeeded * 0.05)); // 5% de quebra (mínimo 2 folhas de acerto)
@@ -167,6 +170,7 @@ export function calculateOrderCost(params: {
   const premMarkup = Math.round(recMarkup * 1.4);
 
   return {
+    nestingOrientation: isPlotterM2 ? undefined : nestingOrientation,
     itemsPerSheet,
     sheetsNeeded,
     wasteSheets,

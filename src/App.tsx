@@ -11,6 +11,7 @@ import {
   Order,
   OrderStatus,
   PaymentStatus,
+  QuickProductPreset,
   StockMovement,
 } from './types';
 import { StorageService } from './services/storageService';
@@ -32,6 +33,7 @@ export default function App() {
   const [materials, setMaterials] = useState<Material[]>(StorageService.getMaterials());
   const [equipments, setEquipments] = useState<Equipment[]>(StorageService.getEquipments());
   const [movements, setMovements] = useState<StockMovement[]>(StorageService.getStockMovements());
+  const [presets, setPresets] = useState<QuickProductPreset[]>(StorageService.getPresets());
 
   // Modals state
   const [isGerarPedidoOpen, setIsGerarPedidoOpen] = useState(false);
@@ -49,6 +51,7 @@ export default function App() {
     setMaterials(StorageService.getMaterials());
     setEquipments(StorageService.getEquipments());
     setMovements(StorageService.getStockMovements());
+    setPresets(StorageService.getPresets());
   };
 
   const handleSaveOrder = (newOrder: Order) => {
@@ -153,7 +156,45 @@ export default function App() {
       all[idx] = updatedEq;
       StorageService.saveEquipments(all);
       refreshData();
+      showToast(`Equipamento "${updatedEq.name}" atualizado!`);
     }
+  };
+
+  const handleDeleteEquipment = (equipmentId: string) => {
+    const all = StorageService.getEquipments();
+    const toDelete = all.find((e) => e.id === equipmentId);
+    const updated = all.filter((e) => e.id !== equipmentId);
+    StorageService.saveEquipments(updated);
+    refreshData();
+    showToast(`Equipamento "${toDelete?.name || ''}" removido com sucesso.`);
+  };
+
+  const handleAddPreset = (newPreset: QuickProductPreset) => {
+    const all = StorageService.getPresets();
+    const updated = [...all, newPreset];
+    StorageService.savePresets(updated);
+    refreshData();
+    showToast(`Modelo rápido "${newPreset.label}" criado com sucesso!`);
+  };
+
+  const handleUpdatePreset = (updatedPreset: QuickProductPreset) => {
+    const all = StorageService.getPresets();
+    const idx = all.findIndex((p) => p.id === updatedPreset.id);
+    if (idx !== -1) {
+      all[idx] = updatedPreset;
+      StorageService.savePresets(all);
+      refreshData();
+      showToast(`Modelo rápido "${updatedPreset.label}" atualizado!`);
+    }
+  };
+
+  const handleDeletePreset = (presetId: string) => {
+    const all = StorageService.getPresets();
+    const pToDelete = all.find((p) => p.id === presetId);
+    const updated = all.filter((p) => p.id !== presetId);
+    StorageService.savePresets(updated);
+    refreshData();
+    showToast(`Modelo rápido "${pToDelete?.label || ''}" excluído.`);
   };
 
   const ordersInProductionCount = orders.filter(
@@ -209,6 +250,7 @@ export default function App() {
           <CostCalculatorView
             materials={materials}
             equipments={equipments}
+            presets={presets}
             onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
           />
         )}
@@ -229,6 +271,7 @@ export default function App() {
             equipments={equipments}
             onAddEquipment={handleAddEquipment}
             onUpdateEquipment={handleUpdateEquipment}
+            onDeleteEquipment={handleDeleteEquipment}
             onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
           />
         )}
@@ -239,6 +282,10 @@ export default function App() {
         <GerarPedidoModal
           materials={materials}
           equipments={equipments}
+          presets={presets}
+          onAddPreset={handleAddPreset}
+          onUpdatePreset={handleUpdatePreset}
+          onDeletePreset={handleDeletePreset}
           onSaveOrder={handleSaveOrder}
           onClose={() => setIsGerarPedidoOpen(false)}
         />

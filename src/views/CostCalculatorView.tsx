@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Equipment, Material } from '../types';
+import { Equipment, Material, QuickProductPreset } from '../types';
 import {
   calculateOrderCost,
   calculateSheetNesting,
@@ -17,12 +17,14 @@ import {
 interface CostCalculatorViewProps {
   materials: Material[];
   equipments: Equipment[];
+  presets?: QuickProductPreset[];
   onOpenGerarPedido: () => void;
 }
 
 export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
   materials,
   equipments,
+  presets = [],
   onOpenGerarPedido,
 }) => {
   const [quantity, setQuantity] = useState<number>(1000);
@@ -93,6 +95,27 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
   const itemW = (nesting.orientation === 'girada' ? heightCm : widthCm) * scale;
   const itemH = (nesting.orientation === 'girada' ? widthCm : heightCm) * scale;
 
+  const applyPreset = (preset: QuickProductPreset) => {
+    setWidthCm(preset.widthCm);
+    setHeightCm(preset.heightCm);
+    setPrintSides(preset.printSides);
+    setQuantity(preset.quantity);
+
+    const matchedMat = materials.find((m) =>
+      m.name.toLowerCase().includes(preset.materialKeyword.toLowerCase())
+    );
+    if (matchedMat) setSelectedMaterialId(matchedMat.id);
+
+    if (preset.equipmentId && equipments.some((e) => e.id === preset.equipmentId)) {
+      setSelectedEquipmentId(preset.equipmentId);
+    } else if (preset.isPlotter) {
+      const plotter = equipments.find((e) => e.category === 'plotter');
+      if (plotter) setSelectedEquipmentId(plotter.id);
+    } else if (equipments[0]) {
+      setSelectedEquipmentId(equipments[0].id);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       {/* Top Header */}
@@ -114,6 +137,37 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
           <span>Gerar Pedido</span>
         </button>
       </div>
+
+      {/* Modelos Rápidos Bar in Calculator */}
+      {presets.length > 0 && (
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Simular Modelo Rápido (1-Clique):</span>
+            </span>
+            <button
+              onClick={onOpenGerarPedido}
+              className="text-xs text-amber-600 hover:text-amber-700 font-bold hover:underline cursor-pointer"
+            >
+              + Gerenciar / Novo Modelo
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {presets.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => applyPreset(p)}
+                className="px-2.5 py-1 text-xs font-semibold bg-slate-50 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 hover:border-amber-300 rounded-lg transition-all cursor-pointer"
+                title={`Carregar ${p.name} (${p.widthCm}x${p.heightCm} cm)`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Interactive Form (6 cols) */}

@@ -5,15 +5,19 @@ import {
   Activity,
   Calculator,
   Cpu,
+  Pencil,
   Plus,
   Printer,
+  Trash2,
   Wrench,
+  X,
 } from 'lucide-react';
 
 interface MachinesViewProps {
   equipments: Equipment[];
   onAddEquipment: (equipment: Equipment) => void;
   onUpdateEquipment: (equipment: Equipment) => void;
+  onDeleteEquipment?: (equipmentId: string) => void;
   onOpenGerarPedido: () => void;
 }
 
@@ -21,23 +25,35 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
   equipments,
   onAddEquipment,
   onUpdateEquipment,
+  onDeleteEquipment,
   onOpenGerarPedido,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  const [equipmentToDelete, setEquipmentToDelete] = useState<Equipment | null>(null);
 
   // Quick simulation state
   const [simPages, setSimPages] = useState<number>(500);
   const [simIsColor, setSimIsColor] = useState<boolean>(true);
   const [simMachineId, setSimMachineId] = useState<string>(equipments[0]?.id || '');
 
-  // New Equipment Form
+  // New Equipment Form State
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [category, setCategory] = useState<Equipment['category']>('laser');
-  const [clickPB, setClickPB] = useState<number>(0.045);
-  const [clickColor, setClickColor] = useState<number>(0.18);
-  const [hourlyRate, setHourlyRate] = useState<number>(45.0);
-  const [speed, setSpeed] = useState<number>(1800);
+  const [category, setCategory] = useState<Equipment['category']>('jato_de_tinta');
+  const [clickPB, setClickPB] = useState<number>(0.015);
+  const [clickColor, setClickColor] = useState<number>(0.045);
+  const [hourlyRate, setHourlyRate] = useState<number>(18.0);
+  const [speed, setSpeed] = useState<number>(600);
+
+  // Edit Equipment Form State
+  const [editName, setEditName] = useState('');
+  const [editCode, setEditCode] = useState('');
+  const [editCategory, setEditCategory] = useState<Equipment['category']>('jato_de_tinta');
+  const [editClickPB, setEditClickPB] = useState<number>(0.015);
+  const [editClickColor, setEditClickColor] = useState<number>(0.045);
+  const [editHourlyRate, setEditHourlyRate] = useState<number>(18.0);
+  const [editSpeed, setEditSpeed] = useState<number>(600);
 
   const selectedSim = equipments.find((e) => e.id === simMachineId) || equipments[0];
 
@@ -81,6 +97,58 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
     setCode('');
   };
 
+  const handleStartEdit = (eq: Equipment) => {
+    setEditingEquipment(eq);
+    setEditName(eq.name);
+    setEditCode(eq.code);
+    setEditCategory(eq.category);
+    setEditClickPB(eq.clickCostPB);
+    setEditClickColor(eq.clickCostColor);
+    setEditHourlyRate(eq.hourlyRate);
+    setEditSpeed(eq.speedPerHour);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEquipment || !editName.trim()) return;
+
+    const updated: Equipment = {
+      ...editingEquipment,
+      name: editName.trim(),
+      code: editCode.trim() || editingEquipment.code,
+      category: editCategory,
+      clickCostPB: Number(editClickPB) || 0,
+      clickCostColor: Number(editClickColor) || 0,
+      hourlyRate: Number(editHourlyRate) || 0,
+      speedPerHour: Number(editSpeed) || 0,
+    };
+
+    onUpdateEquipment(updated);
+    setEditingEquipment(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (equipmentToDelete && onDeleteEquipment) {
+      onDeleteEquipment(equipmentToDelete.id);
+      setEquipmentToDelete(null);
+    }
+  };
+
+  const getCategoryLabel = (cat: Equipment['category']) => {
+    switch (cat) {
+      case 'jato_de_tinta':
+        return 'Jato de Tinta';
+      case 'laser':
+        return 'Laser Digital';
+      case 'plotter':
+        return 'Plotter';
+      case 'acabamento':
+        return 'Acabamento';
+      default:
+        return cat;
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       {/* Top Header */}
@@ -113,7 +181,7 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
             </h3>
           </div>
           <p className="text-xs text-slate-400">
-            Calcule o custo instantâneo de rodar uma tiragem específica em qualquer uma de suas impressoras ou plotters.
+            Calcule o custo instantâneo de rodar uma tiragem específica em qualquer uma de suas impressoras ou equipamentos.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
@@ -179,67 +247,108 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {equipments.map((eq) => {
           const isOperational = eq.status === 'operacional';
+          const isInkjet = eq.category === 'jato_de_tinta';
+
           return (
             <div
               key={eq.id}
-              className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs hover:border-slate-300 transition-all space-y-4"
+              className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs hover:border-slate-300 transition-all space-y-4 flex flex-col justify-between"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-800 shrink-0">
-                    <Cpu className="w-5 h-5 text-slate-700" />
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+                        isInkjet ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-800'
+                      }`}
+                    >
+                      <Printer className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 leading-snug">{eq.name}</h4>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs font-mono font-semibold text-slate-400">{eq.code}</span>
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                            isInkjet
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-slate-50 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          {getCategoryLabel(eq.category)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 leading-snug">{eq.name}</h4>
-                    <span className="text-xs font-mono text-slate-400">{eq.code}</span>
-                  </div>
+
+                  <button
+                    onClick={() => toggleStatus(eq)}
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-colors shrink-0 ${
+                      isOperational
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-800 border border-amber-200'
+                    }`}
+                    title="Clique para alternar status operacional"
+                  >
+                    {isOperational ? 'Operacional' : 'Em Manutenção'}
+                  </button>
                 </div>
 
-                <button
-                  onClick={() => toggleStatus(eq)}
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-colors ${
-                    isOperational
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                      : 'bg-amber-50 text-amber-800 border border-amber-200'
-                  }`}
-                  title="Clique para alternar status operacional"
-                >
-                  {isOperational ? 'Operacional' : 'Em Manutenção'}
-                </button>
+                <div className="space-y-2 text-xs border-t border-b border-slate-100 py-3">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Custo Tinta/Clique Color:</span>
+                    <span className="font-mono font-bold text-slate-900 tabular-nums">
+                      {formatBRL(eq.clickCostColor)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Custo Tinta/Clique PB:</span>
+                    <span className="font-mono font-bold text-slate-900 tabular-nums">
+                      {formatBRL(eq.clickCostPB)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Taxa Operacional/Hora:</span>
+                    <span className="font-mono font-bold text-slate-900 tabular-nums">
+                      {formatBRL(eq.hourlyRate)}/h
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Velocidade de Trabalho:</span>
+                    <span className="font-mono text-slate-800 tabular-nums">
+                      {eq.speedPerHour} un/h
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2 text-xs border-t border-b border-slate-100 py-3">
-                <div className="flex justify-between text-slate-600">
-                  <span>Custo Clique Color:</span>
-                  <span className="font-mono font-bold text-slate-900 tabular-nums">
-                    {formatBRL(eq.clickCostColor)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Custo Clique PB:</span>
-                  <span className="font-mono font-bold text-slate-900 tabular-nums">
-                    {formatBRL(eq.clickCostPB)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Taxa Operacional/Hora:</span>
-                  <span className="font-mono font-bold text-slate-900 tabular-nums">
-                    {formatBRL(eq.hourlyRate)}/h
-                  </span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Velocidade de Trabalho:</span>
-                  <span className="font-mono text-slate-800 tabular-nums">
-                    {eq.speedPerHour} un/h
-                  </span>
-                </div>
-              </div>
+              {/* Action Buttons: Editar, Excluir & Usar em Pedido */}
+              <div className="flex items-center justify-between pt-1 gap-2">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleStartEdit(eq)}
+                    className="px-2.5 py-1 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                    title="Editar parâmetros desta impressora"
+                  >
+                    <Pencil className="w-3 h-3 text-amber-600" />
+                    <span>Editar</span>
+                  </button>
 
-              <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span className="capitalize">{eq.category}</span>
+                  {onDeleteEquipment && (
+                    <button
+                      onClick={() => setEquipmentToDelete(eq)}
+                      className="px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                      title="Excluir equipamento"
+                    >
+                      <Trash2 className="w-3 h-3 text-rose-600" />
+                      <span>Excluir</span>
+                    </button>
+                  )}
+                </div>
+
                 <button
                   onClick={onOpenGerarPedido}
-                  className="font-bold text-amber-700 hover:text-amber-800 hover:underline cursor-pointer"
+                  className="font-bold text-xs text-amber-700 hover:text-amber-800 hover:underline cursor-pointer"
                 >
                   Usar em Pedido →
                 </button>
@@ -265,7 +374,7 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Konica Minolta AccurioPress C4070"
+                  placeholder="Ex: Impressora l4260 jato de tinta"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
@@ -277,12 +386,13 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
                   <label className="block font-medium text-slate-700 mb-1">Código</label>
                   <input
                     type="text"
-                    placeholder="EQ-05"
+                    placeholder="EQ-03"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg text-xs"
                   />
                 </div>
+
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">Categoria</label>
                   <select
@@ -290,9 +400,10 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
                     onChange={(e) => setCategory(e.target.value as any)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold"
                   >
+                    <option value="jato_de_tinta">Jato de Tinta (Tanque)</option>
                     <option value="laser">Laser Digital</option>
-                    <option value="plotter">Plotter Comunicação</option>
-                    <option value="acabamento">Acabamento / Corte</option>
+                    <option value="plotter">Plotter</option>
+                    <option value="acabamento">Acabamento</option>
                   </select>
                 </div>
               </div>
@@ -300,7 +411,7 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Custo Clique Color (R$)
+                    Custo Tinta/Clique Color (R$)
                   </label>
                   <input
                     type="number"
@@ -314,7 +425,7 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
 
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Custo Clique PB (R$)
+                    Custo Tinta/Clique PB (R$)
                   </label>
                   <input
                     type="number"
@@ -372,6 +483,194 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Máquina */}
+      {editingEquipment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-amber-500" />
+                  <span>Editar Equipamento</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Atualize custos por página/tinta, hora e velocidade.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingEquipment(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">
+                  Nome do Equipamento / Modelo
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Código</label>
+                  <input
+                    type="text"
+                    value={editCode}
+                    onChange={(e) => setEditCode(e.target.value)}
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Categoria</label>
+                  <select
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold"
+                  >
+                    <option value="jato_de_tinta">Jato de Tinta (Tanque)</option>
+                    <option value="laser">Laser Digital</option>
+                    <option value="plotter">Plotter</option>
+                    <option value="acabamento">Acabamento</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">
+                    Custo Tinta/Clique Color (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={editClickColor}
+                    onChange={(e) => setEditClickColor(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">
+                    Custo Tinta/Clique PB (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={editClickPB}
+                    onChange={(e) => setEditClickPB(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">
+                    Hora Operacional (R$/h)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={editHourlyRate}
+                    onChange={(e) => setEditHourlyRate(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">
+                    Velocidade (un/h ou m²/h)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editSpeed}
+                    onChange={(e) => setEditSpeed(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingEquipment(null)}
+                  className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg cursor-pointer"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmação de Exclusão de Máquina */}
+      {equipmentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center gap-3 text-rose-600 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Excluir Máquina?</h3>
+                <p className="text-xs text-slate-500">Remover equipamento do parque gráfico</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 my-4 text-xs space-y-1">
+              <div className="font-bold text-slate-900">{equipmentToDelete.name}</div>
+              <div className="text-slate-500 font-mono">
+                {equipmentToDelete.code} · {getCategoryLabel(equipmentToDelete.category)}
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 mb-5">
+              Tem certeza de que deseja excluir a máquina "{equipmentToDelete.name}"?
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEquipmentToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Sim, Excluir</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

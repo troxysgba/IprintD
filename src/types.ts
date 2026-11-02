@@ -71,7 +71,7 @@ export interface Equipment {
   id: string;
   code: string;
   name: string;
-  category: 'laser' | 'plotter' | 'acabamento';
+  category: 'laser' | 'jato_de_tinta' | 'plotter' | 'acabamento';
   clickCostPB: number;
   clickCostColor: number;
   hourlyRate: number;
@@ -90,6 +90,19 @@ export interface StockMovement {
   newStock: number;
   orderCode?: string;
   notes: string;
+}
+
+export interface QuickProductPreset {
+  id: string;
+  label: string;
+  name: string;
+  widthCm: number; // Largura em centímetros (cm)
+  heightCm: number; // Altura em centímetros (cm)
+  printSides: '4x0' | '4x4' | '1x0' | '1x1';
+  quantity: number;
+  materialKeyword: string;
+  equipmentId?: string;
+  isPlotter?: boolean;
 }
 
 export type ActivePage = 'visao_geral' | 'pedidos' | 'calculo_custo' | 'estoque' | 'maquinas';
