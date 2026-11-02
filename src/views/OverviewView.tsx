@@ -81,7 +81,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             Sistema Gráfica Rápida
           </span>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white mt-1.5">
-            Visão Geral da Oficina
+            Visão Geral da Gráfica.
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
             Acompanhe pedidos ativos, faturamento, maquinários e controle de estoque em tempo real.
