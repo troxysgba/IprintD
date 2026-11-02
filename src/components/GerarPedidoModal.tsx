@@ -789,10 +789,10 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                       onChange={(e) => setPrintSides(e.target.value as any)}
                       className="w-full px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg"
                     >
-                      <option value="4x4">4x4 (Frente e Verso Color)</option>
-                      <option value="4x0">4x0 (Só Frente Color)</option>
-                      <option value="1x1">1x1 (Frente e Verso P&B)</option>
-                      <option value="1x0">1x0 (Só Frente P&B)</option>
+                      <option value="4x0">FRENTE, COLORIDA.</option>
+                      <option value="4x4">FRENTE & VERSO, COLORIDA.</option>
+                      <option value="1x0">FRENTE, PRETO & BRANCO.</option>
+                      <option value="1x1">FRENTE & VERSO, PRETO & BRANCO.</option>
                     </select>
                   </div>
                 </div>
@@ -1221,10 +1221,10 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                     onChange={(e) => setNewPresetSides(e.target.value as any)}
                     className="w-full px-3 py-2 font-semibold bg-slate-50 border border-slate-200 rounded-lg"
                   >
-                    <option value="4x4">4x4 (Frente e Verso Color)</option>
-                    <option value="4x0">4x0 (Só Frente Color)</option>
-                    <option value="1x1">1x1 (Frente e Verso P&B)</option>
-                    <option value="1x0">1x0 (Só Frente P&B)</option>
+                    <option value="4x0">FRENTE, COLORIDA.</option>
+                    <option value="4x4">FRENTE & VERSO, COLORIDA.</option>
+                    <option value="1x0">FRENTE, PRETO & BRANCO.</option>
+                    <option value="1x1">FRENTE & VERSO, PRETO & BRANCO.</option>
                   </select>
                 </div>
                 <div>
@@ -1375,10 +1375,10 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                     onChange={(e) => setEditPresetSides(e.target.value as any)}
                     className="w-full px-3 py-2 font-semibold bg-slate-50 border border-slate-200 rounded-lg"
                   >
-                    <option value="4x4">4x4 (Frente e Verso Color)</option>
-                    <option value="4x0">4x0 (Só Frente Color)</option>
-                    <option value="1x1">1x1 (Frente e Verso P&B)</option>
-                    <option value="1x0">1x0 (Só Frente P&B)</option>
+                    <option value="4x0">FRENTE, COLORIDA.</option>
+                    <option value="4x4">FRENTE & VERSO, COLORIDA.</option>
+                    <option value="1x0">FRENTE, PRETO & BRANCO.</option>
+                    <option value="1x1">FRENTE & VERSO, PRETO & BRANCO.</option>
                   </select>
                 </div>
                 <div>
