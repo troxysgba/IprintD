@@ -1,0 +1,6 @@
+{
+  "name": "PrintFlow - Sistema para Gráfica Rápida",
+  "description": "Sistema completo de gestão para gráficas rápidas: controle de pedidos, gerador de orçamentos, custo por produção com aproveitamento de papel, formação de preço de venda, cadastro de insumos e maquinários, controle de estoque com baixa automática e emissor de notas fiscais.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
