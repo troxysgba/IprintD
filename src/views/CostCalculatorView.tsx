@@ -200,7 +200,7 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
         : `Folha ${sheetType.toUpperCase()} (${SHEET_FORMATS[sheetType as 'a4' | 'a3' | 'sra3']?.badge || ''})`;
 
     const text =
-      `*Orçamento Gráfico - PrintFlow*\n` +
+      `*Orçamento Gráfico - IprintDesginer*\n` +
       `📦 Item: ${widthCm} x ${heightCm} cm (${printSides})\n` +
       `🔢 Quantidade: ${quantity.toLocaleString('pt-BR')} un\n` +
       `📄 Formato de Aproveitamento: ${mediaText}\n` +

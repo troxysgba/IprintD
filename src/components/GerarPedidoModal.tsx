@@ -80,15 +80,17 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
   // 3. Material e Máquina
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>(
-    materials[0]?.id || ''
+    initialOrderData?.materialId || materials[0]?.id || ''
   );
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>(
-    equipments[0]?.id || ''
+    initialOrderData?.equipmentId || equipments[0]?.id || ''
   );
 
   // 4. Preço e Margem
   const [markupPercent, setMarkupPercent] = useState<number>(120);
-  const [customFinalPrice, setCustomFinalPrice] = useState<number | null>(null);
+  const [customFinalPrice, setCustomFinalPrice] = useState<number | null>(
+    initialOrderData?.finalPrice ?? null
+  );
 
   // Copy feedback
   const [copied, setCopied] = useState(false);
@@ -356,20 +358,21 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
   // Save handler for Order / Budget
   const handleSave = (type: 'pedido' | 'orcamento') => {
+    const isEditing = Boolean(initialOrderData?.id);
     const prefix = type === 'pedido' ? 'OS' : 'ORC';
-    const randomCode = `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const code = initialOrderData?.code || `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newOrder: Order = {
-      id: `ord_${Date.now()}`,
-      code: randomCode,
+      id: initialOrderData?.id || `ord_${Date.now()}`,
+      code,
       type,
       clientName: clientName.trim() || 'Cliente Balcão',
       clientPhone: clientPhone.trim() || '',
-      createdAt: new Date().toISOString(),
-      deadline: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
-      status: type === 'pedido' ? 'em_producao' : 'orcamento',
-      paymentStatus: 'pendente',
-      paymentMethod: 'pix',
+      createdAt: initialOrderData?.createdAt || new Date().toISOString(),
+      deadline: initialOrderData?.deadline || new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+      status: initialOrderData?.status || (type === 'pedido' ? 'em_producao' : 'orcamento'),
+      paymentStatus: initialOrderData?.paymentStatus || 'pendente',
+      paymentMethod: initialOrderData?.paymentMethod || 'pix',
       productName: productName.trim() || 'Serviço Gráfico',
       quantity,
       widthCm,
@@ -400,7 +403,7 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       deliveryFee: hasDelivery ? 7 : 0,
       deliveryAddress: hasDelivery ? deliveryAddress.trim() : undefined,
       notes: notes.trim(),
-      stockDeducted: false,
+      stockDeducted: initialOrderData?.stockDeducted || false,
     };
 
     onSaveOrder(newOrder);
@@ -418,10 +421,14 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold tracking-tight text-white">
-                Gerar Pedido / Orçamento
+                {initialOrderData?.id
+                  ? `Editar ${initialOrderData.type === 'pedido' ? 'Pedido' : 'Orçamento'} (${initialOrderData.code})`
+                  : 'Gerar Pedido / Orçamento'}
               </h2>
               <p className="text-xs text-slate-400">
-                Cadastro rápido, cálculo em centímetros (cm) e envio para o WhatsApp
+                {initialOrderData?.id
+                  ? 'Atualize dados, dimensões em cm, materiais ou valores.'
+                  : 'Cadastro rápido, cálculo em centímetros (cm) e envio para o WhatsApp'}
               </p>
             </div>
           </div>
@@ -1102,7 +1109,11 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
               onClick={() => handleSave('orcamento')}
               className="flex-1 sm:flex-none px-4 py-2.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl transition-colors cursor-pointer text-center"
             >
-              Salvar como Orçamento
+              {initialOrderData?.id
+                ? initialOrderData.type === 'orcamento'
+                  ? 'Salvar Alterações'
+                  : 'Salvar como Orçamento'
+                : 'Salvar como Orçamento'}
             </button>
 
             <button
@@ -1111,7 +1122,13 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
               className="flex-1 sm:flex-none px-5 py-2.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-md transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
               <CheckCircle2 className="w-4 h-4 text-amber-400" />
-              <span>Gerar Pedido (OS)</span>
+              <span>
+                {initialOrderData?.id
+                  ? initialOrderData.type === 'pedido'
+                    ? 'Salvar Alterações do Pedido'
+                    : 'Converter em Pedido (OS)'
+                  : 'Gerar Pedido (OS)'}
+              </span>
             </button>
           </div>
         </div>

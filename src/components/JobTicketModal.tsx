@@ -47,7 +47,7 @@ export const JobTicketModal: React.FC<JobTicketModalProps> = ({ order, onClose }
           {/* Header */}
           <div className="flex justify-between items-start border-b-2 border-slate-900 pb-3">
             <div>
-              <div className="text-lg font-black tracking-tight">PrintFlow Gráfica Rápida</div>
+              <div className="text-lg font-black tracking-tight">IprintDesginer Gráfica Rápida</div>
               <div className="text-[11px] text-slate-600 font-semibold uppercase">
                 FICHA TÉCNICA DE PRODUÇÃO / BANCADA (JOB TICKET)
               </div>

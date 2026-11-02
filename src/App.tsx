@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ActivePage,
   Equipment,
@@ -28,12 +28,13 @@ import { CheckCircle2 } from 'lucide-react';
 export default function App() {
   const [activePage, setActivePage] = useState<ActivePage>('visao_geral');
 
-  // Application Data States
+  // Application Data States (Initialized with local cache, updated live from Firestore)
   const [orders, setOrders] = useState<Order[]>(StorageService.getOrders());
   const [materials, setMaterials] = useState<Material[]>(StorageService.getMaterials());
   const [equipments, setEquipments] = useState<Equipment[]>(StorageService.getEquipments());
   const [movements, setMovements] = useState<StockMovement[]>(StorageService.getStockMovements());
   const [presets, setPresets] = useState<QuickProductPreset[]>(StorageService.getPresets());
+  const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
 
   // Modals state
   const [isGerarPedidoOpen, setIsGerarPedidoOpen] = useState(false);
@@ -51,156 +52,152 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Sync state helpers
-  const refreshData = () => {
-    setOrders(StorageService.getOrders());
-    setMaterials(StorageService.getMaterials());
-    setEquipments(StorageService.getEquipments());
-    setMovements(StorageService.getStockMovements());
-    setPresets(StorageService.getPresets());
-  };
+  // Real-time multi-user synchronization with Firebase Firestore
+  useEffect(() => {
+    StorageService.initConnection();
 
-  const handleSaveOrder = (newOrder: Order) => {
-    const existing = StorageService.getOrders();
-    const updated = [newOrder, ...existing.filter((o) => o.id !== newOrder.id)];
-    StorageService.saveOrders(updated);
+    const unsubOrders = StorageService.subscribeOrders((liveOrders) => {
+      setOrders(liveOrders);
+      setIsCloudConnected(true);
+    });
+
+    const unsubMaterials = StorageService.subscribeMaterials((liveMaterials) => {
+      setMaterials(liveMaterials);
+    });
+
+    const unsubEquipments = StorageService.subscribeEquipments((liveEquipments) => {
+      setEquipments(liveEquipments);
+    });
+
+    const unsubPresets = StorageService.subscribePresets((livePresets) => {
+      setPresets(livePresets);
+    });
+
+    const unsubMovements = StorageService.subscribeStockMovements((liveMovements) => {
+      setMovements(liveMovements);
+    });
+
+    return () => {
+      unsubOrders();
+      unsubMaterials();
+      unsubEquipments();
+      unsubPresets();
+      unsubMovements();
+    };
+  }, []);
+
+  // Save order directly to Firestore (synchronized across all connected users instantly)
+  const handleSaveOrder = async (newOrder: Order) => {
+    const isEdit = orders.some((o) => o.id === newOrder.id);
+    await StorageService.saveOrder(newOrder);
 
     if (newOrder.type === 'pedido') {
-      StorageService.deductStockForOrder(newOrder);
+      await StorageService.deductStockForOrder(newOrder);
     }
 
-    refreshData();
     showToast(
-      `${newOrder.type === 'pedido' ? 'Pedido' : 'Orçamento'} ${newOrder.code} gerado com sucesso!`
+      `${newOrder.type === 'pedido' ? 'Pedido' : 'Orçamento'} ${newOrder.code} ${
+        isEdit ? 'atualizado e salvo na nuvem' : 'criado e compartilhado na nuvem'
+      }!`
     );
   };
 
-  const handleUpdateOrderStatus = (orderId: string, nextStatus: OrderStatus) => {
-    const allOrders = StorageService.getOrders();
-    const idx = allOrders.findIndex((o) => o.id === orderId);
-    if (idx === -1) return;
+  const handleDeleteOrder = async (orderId: string) => {
+    const orderToDelete = orders.find((o) => o.id === orderId);
+    await StorageService.deleteOrder(orderId);
+    showToast(`Pedido ${orderToDelete?.code || ''} excluído da nuvem.`);
+  };
 
-    const order = allOrders[idx];
+  const handleEditOrder = (order: Order) => {
+    handleOpenGerarPedido(order);
+  };
+
+  const handleUpdateOrderStatus = async (orderId: string, nextStatus: OrderStatus) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+
     const updatedOrder: Order = {
       ...order,
       status: nextStatus,
     };
 
-    allOrders[idx] = updatedOrder;
-    StorageService.saveOrders(allOrders);
+    await StorageService.saveOrder(updatedOrder);
 
     if (['em_producao', 'pronto', 'entregue'].includes(nextStatus)) {
-      StorageService.deductStockForOrder(updatedOrder);
+      await StorageService.deductStockForOrder(updatedOrder);
     }
 
-    refreshData();
     showToast(`Pedido ${order.code} atualizado para "${nextStatus.replace('_', ' ')}"!`);
   };
 
-  const handleUpdatePayment = (orderId: string, paymentStatus: PaymentStatus) => {
-    const allOrders = StorageService.getOrders();
-    const idx = allOrders.findIndex((o) => o.id === orderId);
-    if (idx === -1) return;
+  const handleUpdatePayment = async (orderId: string, paymentStatus: PaymentStatus) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
 
-    allOrders[idx].paymentStatus = paymentStatus;
-    StorageService.saveOrders(allOrders);
-    refreshData();
-    showToast(`Pagamento da OS ${allOrders[idx].code} alterado para "${paymentStatus}".`);
+    const updatedOrder: Order = {
+      ...order,
+      paymentStatus,
+    };
+    await StorageService.saveOrder(updatedOrder);
+    showToast(`Pagamento da OS ${order.code} alterado para "${paymentStatus}".`);
   };
 
-  const handleAddMaterial = (newMat: Material) => {
-    const all = StorageService.getMaterials();
-    const updated = [...all, newMat];
-    StorageService.saveMaterials(updated);
-    refreshData();
-    showToast(`Insumo "${newMat.name}" cadastrado com sucesso!`);
+  const handleAddMaterial = async (newMat: Material) => {
+    await StorageService.saveMaterial(newMat);
+    showToast(`Insumo "${newMat.name}" salvo na nuvem!`);
   };
 
-  const handleUpdateMaterial = (updatedMat: Material) => {
-    const all = StorageService.getMaterials();
-    const idx = all.findIndex((m) => m.id === updatedMat.id);
-    if (idx !== -1) {
-      all[idx] = updatedMat;
-      StorageService.saveMaterials(all);
-      refreshData();
-      showToast(`Insumo "${updatedMat.name}" atualizado com sucesso!`);
-    }
+  const handleUpdateMaterial = async (updatedMat: Material) => {
+    await StorageService.saveMaterial(updatedMat);
+    showToast(`Insumo "${updatedMat.name}" atualizado na nuvem!`);
   };
 
-  const handleDeleteMaterial = (materialId: string) => {
-    const all = StorageService.getMaterials();
-    const matToDelete = all.find((m) => m.id === materialId);
-    const updated = all.filter((m) => m.id !== materialId);
-    StorageService.saveMaterials(updated);
-    refreshData();
-    showToast(`Insumo "${matToDelete?.name || ''}" excluído com sucesso.`);
+  const handleDeleteMaterial = async (materialId: string) => {
+    const matToDelete = materials.find((m) => m.id === materialId);
+    await StorageService.deleteMaterial(materialId);
+    showToast(`Insumo "${matToDelete?.name || ''}" removido.`);
   };
 
-  const handleRecordStockMovement = (
+  const handleRecordStockMovement = async (
     materialId: string,
     type: 'entrada' | 'saida_manual' | 'ajuste',
     quantity: number,
     notes: string
   ) => {
-    StorageService.recordStockMovement(materialId, type, quantity, notes);
-    refreshData();
-    showToast(`Movimentação de estoque lançada!`);
+    await StorageService.recordStockMovement(materialId, type, quantity, notes);
+    showToast(`Movimentação de estoque sincronizada!`);
   };
 
-  const handleAddEquipment = (newEq: Equipment) => {
-    const all = StorageService.getEquipments();
-    const updated = [...all, newEq];
-    StorageService.saveEquipments(updated);
-    refreshData();
-    showToast(`Equipamento "${newEq.name}" cadastrado com sucesso!`);
+  const handleAddEquipment = async (newEq: Equipment) => {
+    await StorageService.saveEquipment(newEq);
+    showToast(`Equipamento "${newEq.name}" salvo na nuvem!`);
   };
 
-  const handleUpdateEquipment = (updatedEq: Equipment) => {
-    const all = StorageService.getEquipments();
-    const idx = all.findIndex((e) => e.id === updatedEq.id);
-    if (idx !== -1) {
-      all[idx] = updatedEq;
-      StorageService.saveEquipments(all);
-      refreshData();
-      showToast(`Equipamento "${updatedEq.name}" atualizado!`);
-    }
+  const handleUpdateEquipment = async (updatedEq: Equipment) => {
+    await StorageService.saveEquipment(updatedEq);
+    showToast(`Equipamento "${updatedEq.name}" atualizado!`);
   };
 
-  const handleDeleteEquipment = (equipmentId: string) => {
-    const all = StorageService.getEquipments();
-    const toDelete = all.find((e) => e.id === equipmentId);
-    const updated = all.filter((e) => e.id !== equipmentId);
-    StorageService.saveEquipments(updated);
-    refreshData();
-    showToast(`Equipamento "${toDelete?.name || ''}" removido com sucesso.`);
+  const handleDeleteEquipment = async (equipmentId: string) => {
+    const toDelete = equipments.find((e) => e.id === equipmentId);
+    await StorageService.deleteEquipment(equipmentId);
+    showToast(`Equipamento "${toDelete?.name || ''}" removido.`);
   };
 
-  const handleAddPreset = (newPreset: QuickProductPreset) => {
-    const all = StorageService.getPresets();
-    const updated = [...all, newPreset];
-    StorageService.savePresets(updated);
-    refreshData();
-    showToast(`Modelo rápido "${newPreset.label}" criado com sucesso!`);
+  const handleAddPreset = async (newPreset: QuickProductPreset) => {
+    await StorageService.savePreset(newPreset);
+    showToast(`Modelo rápido "${newPreset.label}" salvo na nuvem!`);
   };
 
-  const handleUpdatePreset = (updatedPreset: QuickProductPreset) => {
-    const all = StorageService.getPresets();
-    const idx = all.findIndex((p) => p.id === updatedPreset.id);
-    if (idx !== -1) {
-      all[idx] = updatedPreset;
-      StorageService.savePresets(all);
-      refreshData();
-      showToast(`Modelo rápido "${updatedPreset.label}" atualizado!`);
-    }
+  const handleUpdatePreset = async (updatedPreset: QuickProductPreset) => {
+    await StorageService.savePreset(updatedPreset);
+    showToast(`Modelo rápido "${updatedPreset.label}" atualizado!`);
   };
 
-  const handleDeletePreset = (presetId: string) => {
-    const all = StorageService.getPresets();
-    const pToDelete = all.find((p) => p.id === presetId);
-    const updated = all.filter((p) => p.id !== presetId);
-    StorageService.savePresets(updated);
-    refreshData();
-    showToast(`Modelo rápido "${pToDelete?.label || ''}" excluído.`);
+  const handleDeletePreset = async (presetId: string) => {
+    const pToDelete = presets.find((p) => p.id === presetId);
+    await StorageService.deletePreset(presetId);
+    showToast(`Modelo "${pToDelete?.label || ''}" removido.`);
   };
 
   const ordersInProductionCount = orders.filter(
@@ -223,9 +220,10 @@ export default function App() {
       <Navbar
         activePage={activePage}
         setActivePage={setActivePage}
-        onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
+        onOpenGerarPedido={() => handleOpenGerarPedido()}
         ordersInProductionCount={ordersInProductionCount}
         lowStockCount={lowStockCount}
+        isCloudConnected={isCloudConnected}
       />
 
       {/* Main Page Viewport */}
@@ -235,7 +233,7 @@ export default function App() {
             orders={orders}
             materials={materials}
             equipments={equipments}
-            onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
+            onOpenGerarPedido={() => handleOpenGerarPedido()}
             onNavigate={setActivePage}
             onUpdateOrderStatus={handleUpdateOrderStatus}
             onSelectOrder={(ord) => setSelectedJobTicketOrder(ord)}
@@ -245,7 +243,9 @@ export default function App() {
         {activePage === 'pedidos' && (
           <OrdersView
             orders={orders}
-            onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
+            onOpenGerarPedido={() => handleOpenGerarPedido()}
+            onEditOrder={handleEditOrder}
+            onDeleteOrder={handleDeleteOrder}
             onUpdateStatus={handleUpdateOrderStatus}
             onUpdatePayment={handleUpdatePayment}
             onViewJobTicket={(ord) => setSelectedJobTicketOrder(ord)}

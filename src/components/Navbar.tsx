@@ -16,6 +16,7 @@ interface NavbarProps {
   onOpenGerarPedido: () => void;
   ordersInProductionCount: number;
   lowStockCount: number;
+  isCloudConnected?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -24,6 +25,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenGerarPedido,
   ordersInProductionCount,
   lowStockCount,
+  isCloudConnected = true,
 }) => {
   const navItems = [
     {
@@ -67,15 +69,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setActivePage('visao_geral')}
               className="flex items-center gap-2.5 text-left focus:outline-none cursor-pointer shrink-0"
             >
-              <div className="w-9 h-9 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center font-bold shadow-xs">
-                <Printer className="w-5 h-5 text-amber-400" />
+              <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shadow-xs shrink-0 bg-slate-900">
+                <img
+                  src="/assets/aistudio/hh1_400541ef.png"
+                  alt="Logo"
+                  className="w-full h-full object-contain"
+                />
               </div>
-              <div className="flex items-baseline gap-1.5">
+              <div className="flex items-baseline">
                 <span className="text-xl font-extrabold tracking-tight text-slate-900">
-                  PrintFlow
-                </span>
-                <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider hidden sm:inline">
-                  Gráfica
+                  IprintDesginer
                 </span>
               </div>
             </button>
@@ -111,8 +114,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               })}
             </nav>
 
-            {/* Crucial CTA: "Gerar Pedido" Button */}
-            <div className="flex items-center gap-2">
+            {/* Live Cloud Status & CTA */}
+            <div className="flex items-center gap-2.5">
+              <div
+                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded-full"
+                title="Banco de Dados Firestore ativo. Pedidos e alterações são sincronizados em tempo real entre todos os usuários."
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Nuvem em Tempo Real</span>
+              </div>
+
               <button
                 onClick={onOpenGerarPedido}
                 className="inline-flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-sm transition-all hover:scale-102 active:scale-98 cursor-pointer whitespace-nowrap"

@@ -1,0 +1,155 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "Ordem de Serviço ou Orçamento compartilhado da gráfica",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 64 },
+        "type": { "type": "string", "enum": ["pedido", "orcamento"] },
+        "clientName": { "type": "string", "maxLength": 200 },
+        "clientPhone": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "deadline": { "type": "string", "maxLength": 50 },
+        "status": {
+          "type": "string",
+          "enum": ["orcamento", "aprovado", "em_producao", "pronto", "entregue", "cancelado"]
+        },
+        "paymentStatus": { "type": "string", "enum": ["pendente", "parcial", "pago"] },
+        "paymentMethod": { "type": "string", "enum": ["pix", "cartao_credito", "cartao_debito", "dinheiro", "faturado"] },
+        "productName": { "type": "string", "maxLength": 250 },
+        "quantity": { "type": "number" },
+        "widthCm": { "type": "number" },
+        "heightCm": { "type": "number" },
+        "printSides": { "type": "string", "enum": ["4x0", "4x4", "1x0", "1x1"] },
+        "materialId": { "type": "string", "maxLength": 128 },
+        "materialName": { "type": "string", "maxLength": 200 },
+        "equipmentId": { "type": "string", "maxLength": 128 },
+        "equipmentName": { "type": "string", "maxLength": 200 },
+        "sheetType": { "type": "string", "enum": ["sra3", "a3", "a4", "bobina"] },
+        "rollWidthCm": { "type": "number" },
+        "linearMetersNeeded": { "type": "number" },
+        "itemsPerSheet": { "type": "number" },
+        "sheetsNeeded": { "type": "number" },
+        "wasteSheets": { "type": "number" },
+        "materialCost": { "type": "number" },
+        "clickCost": { "type": "number" },
+        "machineLaborCost": { "type": "number" },
+        "inkCost": { "type": "number" },
+        "inkPercent": { "type": "number" },
+        "depreciationCost": { "type": "number" },
+        "depreciationPercent": { "type": "number" },
+        "totalCost": { "type": "number" },
+        "suggestedPrice": { "type": "number" },
+        "finalPrice": { "type": "number" },
+        "unitPrice": { "type": "number" },
+        "hasDelivery": { "type": "boolean" },
+        "deliveryFee": { "type": "number" },
+        "deliveryAddress": { "type": "string", "maxLength": 500 },
+        "notes": { "type": "string", "maxLength": 2000 },
+        "stockDeducted": { "type": "boolean" }
+      },
+      "required": ["id", "code", "type", "clientName", "createdAt", "status", "productName", "quantity", "finalPrice"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Insumo, papel ou mídia para produção",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "enum": ["papel", "adesivo", "lona", "acabamento", "tinta"] },
+        "unit": { "type": "string", "enum": ["folha", "m2", "unidade", "pct"] },
+        "widthCm": { "type": "number" },
+        "heightCm": { "type": "number" },
+        "grammage": { "type": "number" },
+        "currentStock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "costPerUnit": { "type": "number" },
+        "supplier": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["id", "code", "name", "category", "unit", "currentStock", "costPerUnit"]
+    },
+    "Equipment": {
+      "title": "Equipment",
+      "description": "Equipamento ou impressora cadastrada",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "enum": ["laser", "jato_de_tinta", "plotter", "acabamento"] },
+        "clickCostPB": { "type": "number" },
+        "clickCostColor": { "type": "number" },
+        "hourlyRate": { "type": "number" },
+        "speedPerHour": { "type": "number" },
+        "status": { "type": "string", "enum": ["operacional", "manutencao"] },
+        "inkPercent": { "type": "number" },
+        "depreciationPercent": { "type": "number" }
+      },
+      "required": ["id", "code", "name", "category", "status"]
+    },
+    "Preset": {
+      "title": "Preset",
+      "description": "Modelo rápido de produto",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "label": { "type": "string", "maxLength": 100 },
+        "name": { "type": "string", "maxLength": 200 },
+        "widthCm": { "type": "number" },
+        "heightCm": { "type": "number" },
+        "printSides": { "type": "string", "enum": ["4x0", "4x4", "1x0", "1x1"] },
+        "quantity": { "type": "number" },
+        "materialKeyword": { "type": "string", "maxLength": 100 },
+        "equipmentId": { "type": "string", "maxLength": 128 },
+        "isPlotter": { "type": "boolean" },
+        "sheetType": { "type": "string", "enum": ["sra3", "a3", "a4", "bobina"] },
+        "rollWidthCm": { "type": "number" }
+      },
+      "required": ["id", "label", "name", "widthCm", "heightCm", "quantity"]
+    },
+    "StockMovement": {
+      "title": "StockMovement",
+      "description": "Registro de movimentação de estoque",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "materialId": { "type": "string", "maxLength": 128 },
+        "materialName": { "type": "string", "maxLength": 200 },
+        "date": { "type": "string", "maxLength": 50 },
+        "type": { "type": "string", "enum": ["entrada", "saida_manual", "consumo_os", "ajuste"] },
+        "quantity": { "type": "number" },
+        "previousStock": { "type": "number" },
+        "newStock": { "type": "number" },
+        "orderCode": { "type": "string", "maxLength": 64 },
+        "notes": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["id", "materialId", "materialName", "date", "type", "quantity"]
+    }
+  },
+  "firestore": {
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Ordens de serviço e orçamentos gráficos compartilhados em tempo real"
+    },
+    "/materials/{materialId}": {
+      "schema": { "$ref": "#/entities/Material" },
+      "description": "Insumos e materiais de estoque compartilhados"
+    },
+    "/equipments/{equipmentId}": {
+      "schema": { "$ref": "#/entities/Equipment" },
+      "description": "Máquinas e impressoras cadastradas"
+    },
+    "/presets/{presetId}": {
+      "schema": { "$ref": "#/entities/Preset" },
+      "description": "Modelos rápidos compartilhados"
+    },
+    "/stockMovements/{movementId}": {
+      "schema": { "$ref": "#/entities/StockMovement" },
+      "description": "Histórico de movimentações de estoque"
+    }
+  }
+}

@@ -1,3 +1,11 @@
+import {
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  setDoc,
+  Unsubscribe,
+} from 'firebase/firestore';
 import { Equipment, Material, Order, QuickProductPreset, StockMovement } from '../types';
 import {
   INITIAL_EQUIPMENTS,
@@ -6,13 +14,15 @@ import {
   INITIAL_PRESETS,
   INITIAL_STOCK_MOVEMENTS,
 } from '../utils/mockData';
+import { db, handleFirestoreError, OperationType, testConnection } from './firebase';
 
 const KEYS = {
-  ORDERS: 'printflow_orders_v2',
-  MATERIALS: 'printflow_materials_v2',
-  EQUIPMENTS: 'printflow_equipments_v3',
-  MOVEMENTS: 'printflow_movements_v2',
-  PRESETS: 'printflow_presets_v2',
+  ORDERS: 'iprint_orders_v3',
+  MATERIALS: 'iprint_materials_v3',
+  EQUIPMENTS: 'iprint_equipments_v3',
+  MOVEMENTS: 'iprint_movements_v3',
+  PRESETS: 'iprint_presets_v3',
+  SEEDED: 'iprint_firestore_seeded_v1',
 };
 
 function load<T>(key: string, fallback: T): T {
@@ -35,74 +45,335 @@ function save<T>(key: string, data: T): void {
 }
 
 export const StorageService = {
+  // Test connection
+  initConnection(): void {
+    testConnection();
+  },
+
+  // Synchronous cache access (used for instant initial React state)
   getOrders(): Order[] {
     return load<Order[]>(KEYS.ORDERS, INITIAL_ORDERS);
   },
-  saveOrders(orders: Order[]): void {
-    save(KEYS.ORDERS, orders);
-  },
-
   getMaterials(): Material[] {
     return load<Material[]>(KEYS.MATERIALS, INITIAL_MATERIALS);
   },
-  saveMaterials(materials: Material[]): void {
-    save(KEYS.MATERIALS, materials);
-  },
-
   getEquipments(): Equipment[] {
-    const loaded = load<Equipment[]>(KEYS.EQUIPMENTS, INITIAL_EQUIPMENTS);
-    // Garante que qualquer resquício de máquinas antigas seja substituído pelas novas impressoras jato de tinta
-    const hasOld = loaded.some(
-      (e) =>
-        e.id === 'eq_ricoh_c5300' ||
-        e.id === 'eq_bizhub_mono' ||
-        e.id === 'eq_plotter_epson' ||
-        e.id === 'eq_guilhotina'
-    );
-    if (hasOld || loaded.length === 0) {
-      save(KEYS.EQUIPMENTS, INITIAL_EQUIPMENTS);
-      return INITIAL_EQUIPMENTS;
-    }
-    return loaded.map((e) => ({
-      ...e,
-      inkPercent: e.inkPercent ?? 3,
-      depreciationPercent: e.depreciationPercent ?? 10,
-    }));
+    return load<Equipment[]>(KEYS.EQUIPMENTS, INITIAL_EQUIPMENTS);
   },
-  saveEquipments(equipments: Equipment[]): void {
-    save(KEYS.EQUIPMENTS, equipments);
-  },
-
   getStockMovements(): StockMovement[] {
     return load<StockMovement[]>(KEYS.MOVEMENTS, INITIAL_STOCK_MOVEMENTS);
   },
-  saveStockMovements(movements: StockMovement[]): void {
-    save(KEYS.MOVEMENTS, movements);
-  },
-
   getPresets(): QuickProductPreset[] {
-    const loaded = load<QuickProductPreset[]>(KEYS.PRESETS, INITIAL_PRESETS);
-    return loaded.map((p) => {
-      if (!p.equipmentId) {
-        return {
-          ...p,
-          equipmentId: p.isPlotter ? 'eq_l3250' : 'eq_l4260',
-        };
-      }
-      return p;
-    });
-  },
-  savePresets(presets: QuickProductPreset[]): void {
-    save(KEYS.PRESETS, presets);
+    return load<QuickProductPreset[]>(KEYS.PRESETS, INITIAL_PRESETS);
   },
 
-  recordStockMovement(
+  // 1. ORDERS - REAL-TIME FIRESTORE MULTI-USER SYNC
+  subscribeOrders(callback: (orders: Order[]) => void): Unsubscribe {
+    const path = 'orders';
+    return onSnapshot(
+      collection(db, path),
+      async (snapshot) => {
+        if (snapshot.empty && !localStorage.getItem(KEYS.SEEDED + '_orders')) {
+          localStorage.setItem(KEYS.SEEDED + '_orders', 'true');
+          // Seed initial orders into Firestore so database is ready for everyone
+          for (const ord of INITIAL_ORDERS) {
+            try {
+              await setDoc(doc(db, path, ord.id), ord);
+            } catch (err) {
+              console.warn('Seeding order failed:', err);
+            }
+          }
+          callback(INITIAL_ORDERS);
+          return;
+        }
+
+        const items: Order[] = [];
+        snapshot.forEach((d) => {
+          items.push(d.data() as Order);
+        });
+
+        // Ordenar pelos mais recentes
+        items.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        save(KEYS.ORDERS, items);
+        callback(items);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  },
+
+  async saveOrder(order: Order): Promise<void> {
+    const path = 'orders';
+    try {
+      await setDoc(doc(db, path, order.id), order);
+      const current = this.getOrders();
+      const exists = current.some((o) => o.id === order.id);
+      const updated = exists
+        ? current.map((o) => (o.id === order.id ? order : o))
+        : [order, ...current];
+      save(KEYS.ORDERS, updated);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${path}/${order.id}`);
+    }
+  },
+
+  async saveOrders(orders: Order[]): Promise<void> {
+    save(KEYS.ORDERS, orders);
+    for (const ord of orders) {
+      await this.saveOrder(ord);
+    }
+  },
+
+  async deleteOrder(orderId: string): Promise<void> {
+    const path = 'orders';
+    try {
+      await deleteDoc(doc(db, path, orderId));
+      const filtered = this.getOrders().filter((o) => o.id !== orderId);
+      save(KEYS.ORDERS, filtered);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `${path}/${orderId}`);
+    }
+  },
+
+  // 2. MATERIALS - REAL-TIME FIRESTORE SYNC
+  subscribeMaterials(callback: (materials: Material[]) => void): Unsubscribe {
+    const path = 'materials';
+    return onSnapshot(
+      collection(db, path),
+      async (snapshot) => {
+        if (snapshot.empty && !localStorage.getItem(KEYS.SEEDED + '_materials')) {
+          localStorage.setItem(KEYS.SEEDED + '_materials', 'true');
+          for (const m of INITIAL_MATERIALS) {
+            try {
+              await setDoc(doc(db, path, m.id), m);
+            } catch (err) {
+              console.warn('Seeding material failed:', err);
+            }
+          }
+          callback(INITIAL_MATERIALS);
+          return;
+        }
+
+        const items: Material[] = [];
+        snapshot.forEach((d) => {
+          items.push(d.data() as Material);
+        });
+        save(KEYS.MATERIALS, items);
+        callback(items);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  },
+
+  async saveMaterial(material: Material): Promise<void> {
+    const path = 'materials';
+    try {
+      await setDoc(doc(db, path, material.id), material);
+      const current = this.getMaterials();
+      const exists = current.some((m) => m.id === material.id);
+      const updated = exists
+        ? current.map((m) => (m.id === material.id ? material : m))
+        : [...current, material];
+      save(KEYS.MATERIALS, updated);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${path}/${material.id}`);
+    }
+  },
+
+  async saveMaterials(materials: Material[]): Promise<void> {
+    save(KEYS.MATERIALS, materials);
+    for (const m of materials) {
+      await this.saveMaterial(m);
+    }
+  },
+
+  async deleteMaterial(materialId: string): Promise<void> {
+    const path = 'materials';
+    try {
+      await deleteDoc(doc(db, path, materialId));
+      const filtered = this.getMaterials().filter((m) => m.id !== materialId);
+      save(KEYS.MATERIALS, filtered);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `${path}/${materialId}`);
+    }
+  },
+
+  // 3. EQUIPMENTS - REAL-TIME FIRESTORE SYNC
+  subscribeEquipments(callback: (equipments: Equipment[]) => void): Unsubscribe {
+    const path = 'equipments';
+    return onSnapshot(
+      collection(db, path),
+      async (snapshot) => {
+        if (snapshot.empty && !localStorage.getItem(KEYS.SEEDED + '_equipments')) {
+          localStorage.setItem(KEYS.SEEDED + '_equipments', 'true');
+          for (const eq of INITIAL_EQUIPMENTS) {
+            try {
+              await setDoc(doc(db, path, eq.id), eq);
+            } catch (err) {
+              console.warn('Seeding equipment failed:', err);
+            }
+          }
+          callback(INITIAL_EQUIPMENTS);
+          return;
+        }
+
+        const items: Equipment[] = [];
+        snapshot.forEach((d) => {
+          items.push(d.data() as Equipment);
+        });
+        save(KEYS.EQUIPMENTS, items);
+        callback(items);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  },
+
+  async saveEquipment(equipment: Equipment): Promise<void> {
+    const path = 'equipments';
+    try {
+      await setDoc(doc(db, path, equipment.id), equipment);
+      const current = this.getEquipments();
+      const exists = current.some((e) => e.id === equipment.id);
+      const updated = exists
+        ? current.map((e) => (e.id === equipment.id ? equipment : e))
+        : [...current, equipment];
+      save(KEYS.EQUIPMENTS, updated);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${path}/${equipment.id}`);
+    }
+  },
+
+  async saveEquipments(equipments: Equipment[]): Promise<void> {
+    save(KEYS.EQUIPMENTS, equipments);
+    for (const eq of equipments) {
+      await this.saveEquipment(eq);
+    }
+  },
+
+  async deleteEquipment(equipmentId: string): Promise<void> {
+    const path = 'equipments';
+    try {
+      await deleteDoc(doc(db, path, equipmentId));
+      const filtered = this.getEquipments().filter((e) => e.id !== equipmentId);
+      save(KEYS.EQUIPMENTS, filtered);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `${path}/${equipmentId}`);
+    }
+  },
+
+  // 4. PRESETS - REAL-TIME FIRESTORE SYNC
+  subscribePresets(callback: (presets: QuickProductPreset[]) => void): Unsubscribe {
+    const path = 'presets';
+    return onSnapshot(
+      collection(db, path),
+      async (snapshot) => {
+        if (snapshot.empty && !localStorage.getItem(KEYS.SEEDED + '_presets')) {
+          localStorage.setItem(KEYS.SEEDED + '_presets', 'true');
+          for (const p of INITIAL_PRESETS) {
+            try {
+              await setDoc(doc(db, path, p.id), p);
+            } catch (err) {
+              console.warn('Seeding preset failed:', err);
+            }
+          }
+          callback(INITIAL_PRESETS);
+          return;
+        }
+
+        const items: QuickProductPreset[] = [];
+        snapshot.forEach((d) => {
+          items.push(d.data() as QuickProductPreset);
+        });
+        save(KEYS.PRESETS, items);
+        callback(items);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  },
+
+  async savePreset(preset: QuickProductPreset): Promise<void> {
+    const path = 'presets';
+    try {
+      await setDoc(doc(db, path, preset.id), preset);
+      const current = this.getPresets();
+      const exists = current.some((p) => p.id === preset.id);
+      const updated = exists
+        ? current.map((p) => (p.id === preset.id ? preset : p))
+        : [...current, preset];
+      save(KEYS.PRESETS, updated);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${path}/${preset.id}`);
+    }
+  },
+
+  async savePresets(presets: QuickProductPreset[]): Promise<void> {
+    save(KEYS.PRESETS, presets);
+    for (const p of presets) {
+      await this.savePreset(p);
+    }
+  },
+
+  async deletePreset(presetId: string): Promise<void> {
+    const path = 'presets';
+    try {
+      await deleteDoc(doc(db, path, presetId));
+      const filtered = this.getPresets().filter((p) => p.id !== presetId);
+      save(KEYS.PRESETS, filtered);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `${path}/${presetId}`);
+    }
+  },
+
+  // 5. MOVEMENTS - REAL-TIME FIRESTORE SYNC
+  subscribeStockMovements(callback: (movements: StockMovement[]) => void): Unsubscribe {
+    const path = 'stockMovements';
+    return onSnapshot(
+      collection(db, path),
+      async (snapshot) => {
+        if (snapshot.empty && !localStorage.getItem(KEYS.SEEDED + '_movements')) {
+          localStorage.setItem(KEYS.SEEDED + '_movements', 'true');
+          for (const m of INITIAL_STOCK_MOVEMENTS) {
+            try {
+              await setDoc(doc(db, path, m.id), m);
+            } catch (err) {
+              console.warn('Seeding movement failed:', err);
+            }
+          }
+          callback(INITIAL_STOCK_MOVEMENTS);
+          return;
+        }
+
+        const items: StockMovement[] = [];
+        snapshot.forEach((d) => {
+          items.push(d.data() as StockMovement);
+        });
+        items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        save(KEYS.MOVEMENTS, items);
+        callback(items);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  },
+
+  async recordStockMovement(
     materialId: string,
     type: 'entrada' | 'saida_manual' | 'consumo_os' | 'ajuste',
     quantity: number,
     notes: string,
     orderCode?: string
-  ): void {
+  ): Promise<void> {
     const materials = this.getMaterials();
     const idx = materials.findIndex((m) => m.id === materialId);
     if (idx === -1) return;
@@ -120,10 +391,8 @@ export const StorageService = {
     }
 
     material.currentStock = Number(next.toFixed(2));
-    materials[idx] = material;
-    this.saveMaterials(materials);
+    await this.saveMaterial(material);
 
-    const movements = this.getStockMovements();
     const newMovement: StockMovement = {
       id: `mov_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       materialId: material.id,
@@ -136,14 +405,19 @@ export const StorageService = {
       orderCode,
       notes,
     };
-    this.saveStockMovements([newMovement, ...movements]);
+
+    try {
+      await setDoc(doc(db, 'stockMovements', newMovement.id), newMovement);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `stockMovements/${newMovement.id}`);
+    }
   },
 
-  deductStockForOrder(order: Order): void {
+  async deductStockForOrder(order: Order): Promise<void> {
     if (order.stockDeducted) return;
     if (order.materialId && (order.sheetsNeeded || order.wasteSheets)) {
       const totalToDeduct = (order.sheetsNeeded || 0) + (order.wasteSheets || 0);
-      this.recordStockMovement(
+      await this.recordStockMovement(
         order.materialId,
         'consumo_os',
         totalToDeduct,
@@ -152,12 +426,11 @@ export const StorageService = {
       );
     }
 
-    const orders = this.getOrders();
-    const idx = orders.findIndex((o) => o.id === order.id);
-    if (idx !== -1) {
-      orders[idx].stockDeducted = true;
-      this.saveOrders(orders);
-    }
+    const updatedOrder: Order = {
+      ...order,
+      stockDeducted: true,
+    };
+    await this.saveOrder(updatedOrder);
   },
 
   resetAll(): void {
@@ -165,5 +438,11 @@ export const StorageService = {
     localStorage.removeItem(KEYS.MATERIALS);
     localStorage.removeItem(KEYS.EQUIPMENTS);
     localStorage.removeItem(KEYS.MOVEMENTS);
+    localStorage.removeItem(KEYS.PRESETS);
+    localStorage.removeItem(KEYS.SEEDED + '_orders');
+    localStorage.removeItem(KEYS.SEEDED + '_materials');
+    localStorage.removeItem(KEYS.SEEDED + '_equipments');
+    localStorage.removeItem(KEYS.SEEDED + '_presets');
+    localStorage.removeItem(KEYS.SEEDED + '_movements');
   },
 };

@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Default deny for unmapped paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Test connection doc
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Orders collection - accessible for team collaboration
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create, update: if isValidId(orderId)
+        && request.resource.data.id is string
+        && request.resource.data.code is string
+        && request.resource.data.clientName is string
+        && request.resource.data.productName is string
+        && request.resource.data.quantity is number;
+      allow delete: if isValidId(orderId);
+    }
+
+    // Materials collection
+    match /materials/{materialId} {
+      allow read: if true;
+      allow create, update: if isValidId(materialId)
+        && request.resource.data.name is string
+        && request.resource.data.costPerUnit is number;
+      allow delete: if isValidId(materialId);
+    }
+
+    // Equipments collection
+    match /equipments/{equipmentId} {
+      allow read: if true;
+      allow create, update: if isValidId(equipmentId)
+        && request.resource.data.name is string;
+      allow delete: if isValidId(equipmentId);
+    }
+
+    // Presets collection
+    match /presets/{presetId} {
+      allow read: if true;
+      allow create, update: if isValidId(presetId)
+        && request.resource.data.label is string
+        && request.resource.data.name is string;
+      allow delete: if isValidId(presetId);
+    }
+
+    // Stock Movements collection
+    match /stockMovements/{movementId} {
+      allow read: if true;
+      allow create, update: if isValidId(movementId)
+        && request.resource.data.materialId is string
+        && request.resource.data.quantity is number;
+      allow delete: if isValidId(movementId);
+    }
+  }
+}

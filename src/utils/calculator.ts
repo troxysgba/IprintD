@@ -530,7 +530,7 @@ export function generateWhatsAppMessage(params: {
   } = params;
 
   return (
-    `*Orçamento Gráfico - PrintFlow*\n\n` +
+    `*Orçamento Gráfico - IprintDesginer*\n\n` +
     `Olá, *${clientName || 'Cliente'}*! Segue a cotação solicitada:\n\n` +
     `📌 *Item:* ${productName}\n` +
     `🔢 *Quantidade:* ${quantity.toLocaleString('pt-BR')} unidades\n` +

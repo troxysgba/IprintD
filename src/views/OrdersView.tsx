@@ -7,18 +7,24 @@ import {
   generateWhatsAppMessage,
 } from '../utils/calculator';
 import {
+  AlertTriangle,
   ArrowRight,
   CheckCircle2,
   MessageSquare,
   Package,
+  Pencil,
   PlusCircle,
   Printer,
   Search,
+  Trash2,
+  X,
 } from 'lucide-react';
 
 interface OrdersViewProps {
   orders: Order[];
   onOpenGerarPedido: () => void;
+  onEditOrder: (order: Order) => void;
+  onDeleteOrder: (orderId: string) => void;
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
   onUpdatePayment: (orderId: string, paymentStatus: PaymentStatus) => void;
   onViewJobTicket: (order: Order) => void;
@@ -36,12 +42,15 @@ const STATUS_LABELS: Record<OrderStatus, { label: string; color: string }> = {
 export const OrdersView: React.FC<OrdersViewProps> = ({
   orders,
   onOpenGerarPedido,
+  onEditOrder,
+  onDeleteOrder,
   onUpdateStatus,
   onUpdatePayment,
   onViewJobTicket,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTab, setFilterTab] = useState<'todos' | 'orcamentos' | 'producao' | 'prontos' | 'concluidos'>('todos');
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
 
   const filteredOrders = useMemo(() => {
     return orders.filter((ord) => {
@@ -321,14 +330,14 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
                 {/* Footer Tools and Status Advance */}
                 <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => onViewJobTicket(ord)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition-colors cursor-pointer"
                       title="Ver e Imprimir Comanda de Produção com medidas em cm"
                     >
                       <Printer className="w-3.5 h-3.5 text-slate-700" />
-                      <span>Comanda de Produção</span>
+                      <span>Comanda</span>
                     </button>
 
                     <button
@@ -336,7 +345,25 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg transition-colors cursor-pointer"
                     >
                       <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Mandar WhatsApp</span>
+                      <span>WhatsApp</span>
+                    </button>
+
+                    <button
+                      onClick={() => onEditOrder(ord)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg transition-colors cursor-pointer"
+                      title="Editar dados e valores deste pedido"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Editar</span>
+                    </button>
+
+                    <button
+                      onClick={() => setOrderToDelete(ord)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg transition-colors cursor-pointer"
+                      title="Excluir este pedido"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                      <span>Excluir</span>
                     </button>
                   </div>
 
@@ -357,6 +384,62 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {orderToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-red-600 font-bold text-sm">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                <span>Excluir {orderToDelete.type === 'pedido' ? 'Pedido' : 'Orçamento'}?</span>
+              </div>
+              <button
+                onClick={() => setOrderToDelete(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-600 space-y-2">
+              <p>
+                Tem certeza que deseja excluir permanentemente o registro{' '}
+                <strong className="text-slate-900 font-mono">{orderToDelete.code}</strong> de{' '}
+                <strong className="text-slate-900">{orderToDelete.clientName}</strong>?
+              </p>
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-slate-700 font-medium">
+                <div>📦 {orderToDelete.productName} ({orderToDelete.quantity.toLocaleString('pt-BR')} un)</div>
+                <div className="text-slate-500 mt-0.5">💰 Valor: {formatBRL(orderToDelete.finalPrice)}</div>
+              </div>
+              <p className="text-[11px] text-red-500 font-medium">
+                Esta ação não pode ser desfeita.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setOrderToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteOrder(orderToDelete.id);
+                  setOrderToDelete(null);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Sim, Excluir</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
