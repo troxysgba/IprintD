@@ -728,12 +728,7 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
                   </span>
                 </div>
 
-                <div className="flex justify-between text-slate-600">
-                  <span>Mão de Obra e Depreciação de Máquina</span>
-                  <span className="font-mono font-bold text-slate-900 tabular-nums">
-                    {formatBRL(costResult.machineLaborCost)}
-                  </span>
-                </div>
+
 
                 <div className="pt-3 border-t border-slate-200 flex justify-between items-baseline font-bold text-sm">
                   <span className="text-slate-900">CUSTO TOTAL DE PRODUÇÃO:</span>

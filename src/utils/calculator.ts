@@ -340,11 +340,8 @@ export function calculateOrderCost(params: {
     // Custo de cliques/impressão zerado no custo base (tinta agora é calculada via % sobre o pedido)
     clickCost = 0;
 
-    const speedM2 = Math.max(4, machineSpeedPerHour || 15);
-    const hours = totalRollM2 / speedM2;
-    const machineLaborCost = Math.max(3.0, hours * (machineHourlyRate || 35.0));
-
-    const totalCost = Number((materialCost + machineLaborCost).toFixed(2));
+    const machineLaborCost = 0;
+    const totalCost = Number(materialCost.toFixed(2));
     const unitCost = quantity > 0 ? Number((totalCost / quantity).toFixed(3)) : 0;
 
     const buildTier = (markup: number): PriceTier => {
@@ -421,11 +418,8 @@ export function calculateOrderCost(params: {
     clickCost = 0;
   }
 
-  const speed = Math.max(20, machineSpeedPerHour || 1500);
-  const hours = totalSheetsToConsume / speed;
-  const machineLaborCost = Math.max(2.5, hours * (machineHourlyRate || 35.0));
-
-  const totalCost = Number((materialCost + machineLaborCost).toFixed(2));
+  const machineLaborCost = 0;
+  const totalCost = Number(materialCost.toFixed(2));
   const unitCost = quantity > 0 ? Number((totalCost / quantity).toFixed(3)) : 0;
 
   const buildTier = (markup: number): PriceTier => {
