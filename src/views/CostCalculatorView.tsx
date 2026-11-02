@@ -9,11 +9,8 @@ import {
 import {
   Calculator,
   Grid,
-  Layers,
   Percent,
   PlusCircle,
-  Printer,
-  Scissors,
   Sparkles,
 } from 'lucide-react';
 
@@ -29,8 +26,8 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
   onOpenGerarPedido,
 }) => {
   const [quantity, setQuantity] = useState<number>(1000);
-  const [widthMm, setWidthMm] = useState<number>(90);
-  const [heightMm, setHeightMm] = useState<number>(50);
+  const [widthCm, setWidthCm] = useState<number>(9);
+  const [heightCm, setHeightCm] = useState<number>(5);
   const [printSides, setPrintSides] = useState<'4x0' | '4x4' | '1x0' | '1x1'>('4x4');
   const [markupPercent, setMarkupPercent] = useState<number>(120);
 
@@ -54,15 +51,15 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
   const isPlotter = selectedEquipment?.category === 'plotter' || selectedMaterial?.unit === 'm2';
 
   const nesting = useMemo(() => {
-    return calculateSheetNesting(widthMm, heightMm);
-  }, [widthMm, heightMm]);
+    return calculateSheetNesting(widthCm, heightCm);
+  }, [widthCm, heightCm]);
 
   const costResult = useMemo(() => {
     if (!selectedMaterial || !selectedEquipment) return null;
     return calculateOrderCost({
       quantity,
-      widthMm,
-      heightMm,
+      widthCm,
+      heightCm,
       printSides,
       costPerSheetOrM2: selectedMaterial.costPerUnit,
       isPlotterM2: isPlotter,
@@ -74,8 +71,8 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
     });
   }, [
     quantity,
-    widthMm,
-    heightMm,
+    widthCm,
+    heightCm,
     printSides,
     selectedMaterial,
     selectedEquipment,
@@ -83,18 +80,18 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
     markupPercent,
   ]);
 
-  // SVG Scaling for imposition preview
+  // SVG Scaling for imposition preview in centimeters
   const previewMaxW = 260;
   const previewMaxH = 180;
   const scale = Math.min(
-    previewMaxW / SRA3_SHEET.widthMm,
-    previewMaxH / SRA3_SHEET.heightMm
+    previewMaxW / SRA3_SHEET.widthCm,
+    previewMaxH / SRA3_SHEET.heightCm
   );
-  const svgW = SRA3_SHEET.widthMm * scale;
-  const svgH = SRA3_SHEET.heightMm * scale;
+  const svgW = SRA3_SHEET.widthCm * scale;
+  const svgH = SRA3_SHEET.heightCm * scale;
 
-  const itemW = (nesting.orientation === 'girada' ? heightMm : widthMm) * scale;
-  const itemH = (nesting.orientation === 'girada' ? widthMm : heightMm) * scale;
+  const itemW = (nesting.orientation === 'girada' ? heightCm : widthCm) * scale;
+  const itemH = (nesting.orientation === 'girada' ? widthCm : heightCm) * scale;
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
@@ -105,7 +102,7 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
             Cálculo de Custo & Engenharia de Preço
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Simulador avançado com aproveitamento geométrico de folha SRA3, cliques e formação de preço.
+            Cálculo em centímetros (cm), aproveitamento na folha SRA3 (33 x 48 cm), cliques e margem de lucro.
           </p>
         </div>
 
@@ -123,7 +120,7 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
         <div className="lg:col-span-6 space-y-4">
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 text-xs">
             <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs border-b border-slate-100 pb-2">
-              Parâmetros da Produção
+              Parâmetros da Produção (em Centímetros)
             </h3>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -139,24 +136,26 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Largura (mm)</label>
+                <label className="block font-medium text-slate-700 mb-1">Largura (cm)</label>
                 <input
                   type="number"
-                  min="10"
-                  value={widthMm}
-                  onChange={(e) => setWidthMm(Math.max(10, parseInt(e.target.value) || 10))}
-                  className="w-full px-3 py-2 font-mono text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                  step="0.1"
+                  min="1"
+                  value={widthCm}
+                  onChange={(e) => setWidthCm(Math.max(0.5, parseFloat(e.target.value) || 0.5))}
+                  className="w-full px-3 py-2 font-mono font-bold text-sm bg-slate-50 border border-slate-200 rounded-lg"
                 />
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Altura (mm)</label>
+                <label className="block font-medium text-slate-700 mb-1">Altura (cm)</label>
                 <input
                   type="number"
-                  min="10"
-                  value={heightMm}
-                  onChange={(e) => setHeightMm(Math.max(10, parseInt(e.target.value) || 10))}
-                  className="w-full px-3 py-2 font-mono text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                  step="0.1"
+                  min="1"
+                  value={heightCm}
+                  onChange={(e) => setHeightCm(Math.max(0.5, parseFloat(e.target.value) || 0.5))}
+                  className="w-full px-3 py-2 font-mono font-bold text-sm bg-slate-50 border border-slate-200 rounded-lg"
                 />
               </div>
             </div>
@@ -206,13 +205,13 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
             </div>
           </div>
 
-          {/* Sheet Imposition Visualization */}
+          {/* Sheet Imposition Visualization in Centimeters */}
           <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Grid className="w-4 h-4 text-amber-400" />
                 <h4 className="text-xs font-bold uppercase tracking-wider">
-                  Aproveitamento na Folha SRA3
+                  Aproveitamento na Folha SRA3 (33 x 48 cm)
                 </h4>
               </div>
               <span className="text-xs font-mono font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
@@ -228,10 +227,10 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
                   className="border border-slate-700 bg-white/5 rounded-sm"
                 >
                   <rect
-                    x={(SRA3_SHEET.widthMm - SRA3_SHEET.printableWidthMm) * 0.5 * scale}
-                    y={(SRA3_SHEET.heightMm - SRA3_SHEET.printableHeightMm) * 0.5 * scale}
-                    width={SRA3_SHEET.printableWidthMm * scale}
-                    height={SRA3_SHEET.printableHeightMm * scale}
+                    x={(SRA3_SHEET.widthCm - SRA3_SHEET.printableWidthCm) * 0.5 * scale}
+                    y={(SRA3_SHEET.heightCm - SRA3_SHEET.printableHeightCm) * 0.5 * scale}
+                    width={SRA3_SHEET.printableWidthCm * scale}
+                    height={SRA3_SHEET.printableHeightCm * scale}
                     fill="none"
                     stroke="#475569"
                     strokeDasharray="2,2"
@@ -240,11 +239,11 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
                   {Array.from({ length: nesting.rows }).map((_, r) =>
                     Array.from({ length: nesting.cols }).map((__, c) => {
                       const x =
-                        (SRA3_SHEET.widthMm - SRA3_SHEET.printableWidthMm) * 0.5 * scale +
+                        (SRA3_SHEET.widthCm - SRA3_SHEET.printableWidthCm) * 0.5 * scale +
                         c * itemW +
                         1;
                       const y =
-                        (SRA3_SHEET.heightMm - SRA3_SHEET.printableHeightMm) * 0.5 * scale +
+                        (SRA3_SHEET.heightCm - SRA3_SHEET.printableHeightCm) * 0.5 * scale +
                         r * itemH +
                         1;
                       return (
@@ -290,9 +289,9 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
                 <div className="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700/60">
                   <div className="text-[10px] text-slate-400">Tamanho Corte</div>
                   <div className="text-sm font-bold text-white">
-                    {widthMm}x{heightMm} mm
+                    {widthCm} x {heightCm} cm
                   </div>
-                  <div className="text-[10px] text-slate-500">+2mm sangria</div>
+                  <div className="text-[10px] text-slate-500">+0,2 cm sangria</div>
                 </div>
 
                 <div className="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700/60">

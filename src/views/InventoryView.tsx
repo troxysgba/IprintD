@@ -7,14 +7,19 @@ import {
   ArrowUpRight,
   Boxes,
   History,
+  Pencil,
   Plus,
   Search,
+  Trash2,
+  X,
 } from 'lucide-react';
 
 interface InventoryViewProps {
   materials: Material[];
   movements: StockMovement[];
   onAddMaterial: (material: Material) => void;
+  onUpdateMaterial: (material: Material) => void;
+  onDeleteMaterial: (materialId: string) => void;
   onRecordMovement: (
     materialId: string,
     type: 'entrada' | 'saida_manual' | 'ajuste',
@@ -27,6 +32,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   materials,
   movements,
   onAddMaterial,
+  onUpdateMaterial,
+  onDeleteMaterial,
   onRecordMovement,
 }) => {
   const [tab, setTab] = useState<'saldos' | 'historico'>('saldos');
@@ -34,24 +41,43 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [isNewMatModalOpen, setIsNewMatModalOpen] = useState(false);
 
+  // Edit material state
+  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+
+  // Delete confirmation state
+  const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
+
   // Quick movement state
   const [selectedMatId, setSelectedMatId] = useState<string>(materials[0]?.id || '');
   const [movQty, setMovQty] = useState<number>(100);
   const [movType, setMovType] = useState<'entrada' | 'saida_manual' | 'ajuste'>('entrada');
   const [movNotes, setMovNotes] = useState('Compra de reposição');
 
-  // New Material form state
+  // New Material form state in centimeters
   const [newName, setNewName] = useState('');
   const [newCode, setNewCode] = useState('');
   const [newCategory, setNewCategory] = useState<MaterialCategory>('papel');
   const [newUnit, setNewUnit] = useState<Material['unit']>('folha');
-  const [newWidth, setNewWidth] = useState(330);
-  const [newHeight, setNewHeight] = useState(480);
+  const [newWidthCm, setNewWidthCm] = useState(33);
+  const [newHeightCm, setNewHeightCm] = useState(48);
   const [newGrammage, setNewGrammage] = useState(300);
   const [newStock, setNewStock] = useState(250);
   const [newMinStock, setNewMinStock] = useState(100);
   const [newCost, setNewCost] = useState(0.68);
   const [newSupplier, setNewSupplier] = useState('');
+
+  // Edit Material form state in centimeters
+  const [editName, setEditName] = useState('');
+  const [editCode, setEditCode] = useState('');
+  const [editCategory, setEditCategory] = useState<MaterialCategory>('papel');
+  const [editUnit, setEditUnit] = useState<Material['unit']>('folha');
+  const [editWidthCm, setEditWidthCm] = useState(33);
+  const [editHeightCm, setEditHeightCm] = useState(48);
+  const [editGrammage, setEditGrammage] = useState(300);
+  const [editStock, setEditStock] = useState(250);
+  const [editMinStock, setEditMinStock] = useState(100);
+  const [editCost, setEditCost] = useState(0.68);
+  const [editSupplier, setEditSupplier] = useState('');
 
   const filteredMaterials = materials.filter((m) => {
     if (searchTerm.trim()) {
@@ -86,8 +112,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       name: newName.trim(),
       category: newCategory,
       unit: newUnit,
-      widthMm: newCategory === 'papel' ? newWidth : undefined,
-      heightMm: newCategory === 'papel' ? newHeight : undefined,
+      widthCm: newCategory === 'papel' ? newWidthCm : undefined,
+      heightCm: newCategory === 'papel' ? newHeightCm : undefined,
       grammage: newCategory === 'papel' ? newGrammage : undefined,
       currentStock: Number(newStock) || 0,
       minStock: Number(newMinStock) || 0,
@@ -102,6 +128,51 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setNewSupplier('');
   };
 
+  const handleStartEdit = (mat: Material) => {
+    setEditingMaterial(mat);
+    setEditName(mat.name);
+    setEditCode(mat.code);
+    setEditCategory(mat.category);
+    setEditUnit(mat.unit);
+    setEditWidthCm(mat.widthCm ?? 33);
+    setEditHeightCm(mat.heightCm ?? 48);
+    setEditGrammage(mat.grammage ?? 300);
+    setEditStock(mat.currentStock);
+    setEditMinStock(mat.minStock);
+    setEditCost(mat.costPerUnit);
+    setEditSupplier(mat.supplier);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMaterial || !editName.trim()) return;
+
+    const updatedMat: Material = {
+      ...editingMaterial,
+      name: editName.trim(),
+      code: editCode.trim() || editingMaterial.code,
+      category: editCategory,
+      unit: editUnit,
+      widthCm: editCategory === 'papel' ? editWidthCm : undefined,
+      heightCm: editCategory === 'papel' ? editHeightCm : undefined,
+      grammage: editCategory === 'papel' ? editGrammage : undefined,
+      currentStock: Number(editStock) || 0,
+      minStock: Number(editMinStock) || 0,
+      costPerUnit: Number(editCost) || 0,
+      supplier: editSupplier.trim() || 'Distribuidor',
+    };
+
+    onUpdateMaterial(updatedMat);
+    setEditingMaterial(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (materialToDelete) {
+      onDeleteMaterial(materialToDelete.id);
+      setMaterialToDelete(null);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       {/* Top Header */}
@@ -111,7 +182,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             Controle de Estoque & Matérias-Primas
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Saldos em tempo real, baixa automática de produção por OS e histórico de compras.
+            Saldos em tempo real com formatos em centímetros (cm), baixa automática e histórico.
           </p>
         </div>
 
@@ -207,11 +278,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <tr>
                   <th className="p-3">Código</th>
                   <th className="p-3">Matéria-Prima / Papel</th>
-                  <th className="p-3">Formato / Gramatura</th>
+                  <th className="p-3">Formato (cm) / Gramatura</th>
                   <th className="p-3 text-right">Custo Unitário</th>
                   <th className="p-3 text-right">Saldo Atual</th>
                   <th className="p-3 text-right">Estoque Mínimo</th>
-                  <th className="p-3 text-right">Ação</th>
+                  <th className="p-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -225,9 +296,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         <div className="text-[11px] text-slate-400">{mat.supplier}</div>
                       </td>
                       <td className="p-3">
-                        {mat.widthMm && mat.heightMm ? (
+                        {mat.widthCm && mat.heightCm ? (
                           <span className="font-mono">
-                            {mat.widthMm}x{mat.heightMm}mm {mat.grammage ? `· ${mat.grammage}g` : ''}
+                            {mat.widthCm} x {mat.heightCm} cm {mat.grammage ? `· ${mat.grammage}g` : ''}
                           </span>
                         ) : (
                           <span className="capitalize text-slate-500">{mat.category}</span>
@@ -250,16 +321,35 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         {mat.minStock} {mat.unit}
                       </td>
                       <td className="p-3 text-right">
-                        <button
-                          onClick={() => {
-                            setSelectedMatId(mat.id);
-                            setMovType('entrada');
-                            setIsEntryModalOpen(true);
-                          }}
-                          className="px-2 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded transition-colors cursor-pointer"
-                        >
-                          + Entrada
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => {
+                              setSelectedMatId(mat.id);
+                              setMovType('entrada');
+                              setIsEntryModalOpen(true);
+                            }}
+                            className="px-2 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition-colors cursor-pointer"
+                            title="Lançar entrada rápida"
+                          >
+                            + Entrada
+                          </button>
+                          <button
+                            onClick={() => handleStartEdit(mat)}
+                            className="px-2.5 py-1 text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 rounded transition-colors cursor-pointer flex items-center gap-1"
+                            title="Editar matéria-prima"
+                          >
+                            <Pencil className="w-3 h-3 text-amber-600" />
+                            <span>Editar</span>
+                          </button>
+                          <button
+                            onClick={() => setMaterialToDelete(mat)}
+                            className="px-2.5 py-1 text-[11px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded transition-colors cursor-pointer flex items-center gap-1"
+                            title="Excluir matéria-prima"
+                          >
+                            <Trash2 className="w-3 h-3 text-rose-600" />
+                            <span>Excluir</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -416,7 +506,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
-      {/* Modal: New Material */}
+      {/* Modal: New Material in Centimeters */}
       {isNewMatModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
@@ -430,7 +520,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Papel Couché 250g Fosco SRA3"
+                  placeholder="Ex: Papel Couché 250g Fosco SRA3 (33x48 cm)"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg"
@@ -479,20 +569,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block font-medium text-slate-700 mb-1">Largura (mm)</label>
+                  <label className="block font-medium text-slate-700 mb-1">Largura (cm)</label>
                   <input
                     type="number"
-                    value={newWidth}
-                    onChange={(e) => setNewWidth(parseInt(e.target.value) || 0)}
+                    step="0.1"
+                    value={newWidthCm}
+                    onChange={(e) => setNewWidthCm(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg"
                   />
                 </div>
                 <div>
-                  <label className="block font-medium text-slate-700 mb-1">Altura (mm)</label>
+                  <label className="block font-medium text-slate-700 mb-1">Altura (cm)</label>
                   <input
                     type="number"
-                    value={newHeight}
-                    onChange={(e) => setNewHeight(parseInt(e.target.value) || 0)}
+                    step="0.1"
+                    value={newHeightCm}
+                    onChange={(e) => setNewHeightCm(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg"
                   />
                 </div>
@@ -559,6 +651,229 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Matéria-Prima */}
+      {editingMaterial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-amber-500" />
+                  <span>Editar Matéria-Prima</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Atualize os parâmetros, medidas em centímetros e custos unitários.
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingMaterial(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">Nome do Insumo</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Papel Couché 300g Brilho SRA3 (33x48 cm)"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Código do Item</label>
+                  <input
+                    type="text"
+                    value={editCode}
+                    onChange={(e) => setEditCode(e.target.value)}
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Categoria</label>
+                  <select
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg"
+                  >
+                    <option value="papel">Papel em Folha</option>
+                    <option value="adesivo">Adesivo Vinil</option>
+                    <option value="lona">Lona / Banner</option>
+                    <option value="acabamento">Acabamento</option>
+                    <option value="tinta">Tinta / Toner</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Unidade</label>
+                  <select
+                    value={editUnit}
+                    onChange={(e) => setEditUnit(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold"
+                  >
+                    <option value="folha">Folha</option>
+                    <option value="m2">m² (Metro)</option>
+                    <option value="unidade">Unidade</option>
+                    <option value="pct">Pacote</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Largura (cm)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editWidthCm}
+                    onChange={(e) => setEditWidthCm(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Altura (cm)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editHeightCm}
+                    onChange={(e) => setEditHeightCm(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              {editCategory === 'papel' && (
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Gramatura (g/m²)</label>
+                  <input
+                    type="number"
+                    value={editGrammage}
+                    onChange={(e) => setEditGrammage(parseInt(e.target.value) || 0)}
+                    placeholder="Ex: 300"
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Custo Unitário (R$)</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={editCost}
+                    onChange={(e) => setEditCost(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Saldo Atual</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editStock}
+                    onChange={(e) => setEditStock(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Estoque Mínimo</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editMinStock}
+                    onChange={(e) => setEditMinStock(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">Fornecedor</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Suzano, Papirus, Imprimax..."
+                  value={editSupplier}
+                  onChange={(e) => setEditSupplier(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingMaterial(null)}
+                  className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmação de Exclusão */}
+      {materialToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center gap-3 text-rose-600 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Excluir Matéria-Prima?</h3>
+                <p className="text-xs text-slate-500">Esta ação removerá o insumo do sistema.</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 my-4 text-xs space-y-1">
+              <div className="font-bold text-slate-900">{materialToDelete.name}</div>
+              <div className="text-slate-500 flex items-center gap-2">
+                <span className="font-mono font-semibold">{materialToDelete.code}</span>
+                <span>•</span>
+                <span>Saldo atual: {materialToDelete.currentStock} {materialToDelete.unit}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 mb-5">
+              Tem certeza de que deseja excluir permanentemente este material? Pedidos antigos já salvos manterão seu histórico, mas o insumo não estará mais disponível para novos orçamentos.
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setMaterialToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Sim, Excluir</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

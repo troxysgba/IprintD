@@ -21,24 +21,24 @@ export interface Order {
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
-  
-  // Item details
+
+  // Detalhes do item (medidas em Centímetros - cm)
   productName: string;
   quantity: number;
-  widthMm: number;
-  heightMm: number;
+  widthCm: number; // Largura em centímetros (cm)
+  heightCm: number; // Altura em centímetros (cm)
   printSides: '4x0' | '4x4' | '1x0' | '1x1';
   materialId: string;
   materialName: string;
   equipmentId: string;
   equipmentName: string;
-  
-  // Imposition & Technical
+
+  // Imposição & Produção
   itemsPerSheet: number;
   sheetsNeeded: number;
   wasteSheets: number;
-  
-  // Financials
+
+  // Custos e Valores
   materialCost: number;
   clickCost: number;
   machineLaborCost: number;
@@ -58,8 +58,8 @@ export interface Material {
   name: string;
   category: MaterialCategory;
   unit: 'folha' | 'm2' | 'unidade' | 'pct';
-  widthMm?: number;
-  heightMm?: number;
+  widthCm?: number; // Largura em centímetros (cm)
+  heightCm?: number; // Altura em centímetros (cm)
   grammage?: number;
   currentStock: number;
   minStock: number;

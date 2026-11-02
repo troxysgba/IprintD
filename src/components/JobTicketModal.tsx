@@ -1,6 +1,6 @@
 import React from 'react';
 import { Order } from '../types';
-import { formatBRL, formatDate } from '../utils/calculator';
+import { formatDate } from '../utils/calculator';
 import { Printer, X } from 'lucide-react';
 
 interface JobTicketModalProps {
@@ -91,7 +91,7 @@ export const JobTicketModal: React.FC<JobTicketModalProps> = ({ order, onClose }
             </div>
           </div>
 
-          {/* Technical Specifications */}
+          {/* Technical Specifications in Centimeters */}
           <div className="border border-slate-300 rounded-lg p-3 space-y-2">
             <div className="flex justify-between items-start">
               <div>
@@ -115,7 +115,7 @@ export const JobTicketModal: React.FC<JobTicketModalProps> = ({ order, onClose }
                   Tamanho de Corte
                 </span>
                 <span className="font-bold text-slate-900">
-                  {order.widthMm} × {order.heightMm} mm
+                  {order.widthCm} × {order.heightCm} cm
                 </span>
               </div>
 

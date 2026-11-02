@@ -11,15 +11,11 @@ import {
   CheckCircle2,
   Copy,
   ExternalLink,
-  HelpCircle,
   Layers,
   MessageSquare,
-  Percent,
-  Plus,
   Printer,
   Sparkles,
   User,
-  Wand2,
   X,
 } from 'lucide-react';
 
@@ -33,8 +29,8 @@ interface GerarPedidoModalProps {
 interface QuickProductPreset {
   label: string;
   name: string;
-  w: number;
-  h: number;
+  w: number; // em cm
+  h: number; // em cm
   sides: '4x0' | '4x4' | '1x0' | '1x1';
   qty: number;
   materialKeyword: string;
@@ -43,57 +39,57 @@ interface QuickProductPreset {
 
 const PRESETS: QuickProductPreset[] = [
   {
-    label: 'Cartão 9x5',
-    name: 'Cartão de Visita 9x5cm Couché 300g',
-    w: 90,
-    h: 50,
+    label: 'Cartão 9x5 cm',
+    name: 'Cartão de Visita 9x5 cm Couché 300g',
+    w: 9,
+    h: 5,
     sides: '4x4',
     qty: 1000,
     materialKeyword: '300g',
   },
   {
-    label: 'Panfleto A5',
-    name: 'Panfleto A5 (148x210mm) Couché 150g',
-    w: 148,
-    h: 210,
+    label: 'Panfleto 15x21 cm',
+    name: 'Panfleto 15x21 cm (A5) Couché 150g',
+    w: 14.8,
+    h: 21,
     sides: '4x0',
     qty: 2500,
     materialKeyword: '150g',
   },
   {
-    label: 'Folder A4',
-    name: 'Folder A4 (297x210mm) 2 Dobras Couché 150g',
-    w: 297,
-    h: 210,
+    label: 'Folder 30x21 cm',
+    name: 'Folder 30x21 cm (A4) 2 Dobras Couché 150g',
+    w: 29.7,
+    h: 21,
     sides: '4x4',
     qty: 500,
     materialKeyword: '150g',
   },
   {
-    label: 'Banner Lona',
-    name: 'Banner Lona 440g c/ Bastão e Ilhós',
-    w: 1000,
-    h: 1500,
+    label: 'Banner 100x150 cm',
+    name: 'Banner Lona 100x150 cm c/ Bastão e Ilhós',
+    w: 100,
+    h: 150,
     sides: '4x0',
     qty: 1,
     materialKeyword: 'Lona',
     isPlotter: true,
   },
   {
-    label: 'Adesivo 5x5',
-    name: 'Adesivo Vinil 5x5cm Meio-Corte',
-    w: 50,
-    h: 50,
+    label: 'Adesivo 5x5 cm',
+    name: 'Adesivo Vinil 5x5 cm Meio-Corte',
+    w: 5,
+    h: 5,
     sides: '4x0',
     qty: 500,
     materialKeyword: 'Vinil',
     isPlotter: true,
   },
   {
-    label: 'Receituário A5',
-    name: 'Receituário A5 Offset 90g Blocado',
-    w: 148,
-    h: 210,
+    label: 'Receituário 15x21 cm',
+    name: 'Receituário 15x21 cm Offset 90g Blocado',
+    w: 14.8,
+    h: 21,
     sides: '1x0',
     qty: 1000,
     materialKeyword: 'Offset',
@@ -110,11 +106,11 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
 
-  // 2. Produto e Especificações
-  const [productName, setProductName] = useState('Cartão de Visita 9x5cm Couché 300g');
+  // 2. Produto e Especificações em Centímetros (cm)
+  const [productName, setProductName] = useState('Cartão de Visita 9x5 cm Couché 300g');
   const [quantity, setQuantity] = useState<number>(1000);
-  const [widthMm, setWidthMm] = useState<number>(90);
-  const [heightMm, setHeightMm] = useState<number>(50);
+  const [widthCm, setWidthCm] = useState<number>(9);
+  const [heightCm, setHeightCm] = useState<number>(5);
   const [printSides, setPrintSides] = useState<'4x0' | '4x4' | '1x0' | '1x1'>('4x4');
   const [notes, setNotes] = useState('');
 
@@ -133,7 +129,6 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
   // Copy feedback
   const [copied, setCopied] = useState(false);
 
-  // Find active material and equipment
   const selectedMaterial = useMemo(
     () => materials.find((m) => m.id === selectedMaterialId) || materials[0],
     [materials, selectedMaterialId]
@@ -146,13 +141,13 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
   const isPlotter = selectedEquipment?.category === 'plotter' || selectedMaterial?.unit === 'm2';
 
-  // Cost and Suggested Price Calculation in Real Time
+  // Cost and Suggested Price Calculation in Real Time with Centimeters
   const costResult = useMemo(() => {
     if (!selectedMaterial || !selectedEquipment) return null;
     return calculateOrderCost({
       quantity,
-      widthMm,
-      heightMm,
+      widthCm,
+      heightCm,
       printSides,
       costPerSheetOrM2: selectedMaterial.costPerUnit,
       isPlotterM2: isPlotter,
@@ -164,8 +159,8 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
     });
   }, [
     quantity,
-    widthMm,
-    heightMm,
+    widthCm,
+    heightCm,
     printSides,
     selectedMaterial,
     selectedEquipment,
@@ -185,8 +180,8 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
   // Apply preset
   const applyPreset = (preset: QuickProductPreset) => {
     setProductName(preset.name);
-    setWidthMm(preset.w);
-    setHeightMm(preset.h);
+    setWidthCm(preset.w);
+    setHeightCm(preset.h);
     setPrintSides(preset.sides);
     setQuantity(preset.qty);
     setCustomFinalPrice(null);
@@ -213,8 +208,8 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       clientName,
       productName,
       quantity,
-      widthMm,
-      heightMm,
+      widthCm,
+      heightCm,
       printSides,
       materialName: selectedMaterial?.name || 'Padrão',
       totalPrice: activeTotalPrice,
@@ -225,8 +220,8 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
     clientName,
     productName,
     quantity,
-    widthMm,
-    heightMm,
+    widthCm,
+    heightCm,
     printSides,
     selectedMaterial,
     activeTotalPrice,
@@ -263,8 +258,8 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       paymentMethod: 'pix',
       productName: productName.trim() || 'Serviço Gráfico',
       quantity,
-      widthMm,
-      heightMm,
+      widthCm,
+      heightCm,
       printSides,
       materialId: selectedMaterial?.id || '',
       materialName: selectedMaterial?.name || '',
@@ -302,7 +297,7 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                 Gerar Pedido / Orçamento
               </h2>
               <p className="text-xs text-slate-400">
-                Cadastro rápido, cálculo automático de custo e envio para o WhatsApp
+                Cadastro rápido, cálculo em centímetros (cm) e envio para o WhatsApp
               </p>
             </div>
           </div>
@@ -317,10 +312,10 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
         {/* Modal Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
-          {/* Quick Presets Strip */}
+          {/* Quick Presets in CM */}
           <div>
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-              Modelos Rápidos (1-Clique):
+              Modelos Rápidos em Centímetros (1-Clique):
             </span>
             <div className="flex flex-wrap gap-1.5">
               {PRESETS.map((p) => (
@@ -379,12 +374,12 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                 </div>
               </div>
 
-              {/* 2. Produto, Medidas e Quantidade */}
+              {/* 2. Produto, Medidas em Centímetros e Quantidade */}
               <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex items-center gap-2">
                   <Layers className="w-4 h-4 text-amber-600" />
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    2. Produto & Especificações
+                    2. Produto & Medidas (em Centímetros - cm)
                   </h3>
                 </div>
 
@@ -396,7 +391,7 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                     type="text"
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
-                    placeholder="Ex: Cartão de Visita 9x5cm Couché 300g"
+                    placeholder="Ex: Cartão de Visita 9x5 cm Couché 300g"
                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                   />
                 </div>
@@ -417,27 +412,29 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Largura (mm)
+                      Largura (cm)
                     </label>
                     <input
                       type="number"
-                      min="10"
-                      value={widthMm}
-                      onChange={(e) => setWidthMm(Math.max(10, parseInt(e.target.value) || 10))}
-                      className="w-full px-3 py-2 text-sm font-mono bg-white border border-slate-300 rounded-lg"
+                      step="0.1"
+                      min="1"
+                      value={widthCm}
+                      onChange={(e) => setWidthCm(Math.max(0.5, parseFloat(e.target.value) || 0.5))}
+                      className="w-full px-3 py-2 text-sm font-mono font-bold bg-white border border-slate-300 rounded-lg"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Altura (mm)
+                      Altura (cm)
                     </label>
                     <input
                       type="number"
-                      min="10"
-                      value={heightMm}
-                      onChange={(e) => setHeightMm(Math.max(10, parseInt(e.target.value) || 10))}
-                      className="w-full px-3 py-2 text-sm font-mono bg-white border border-slate-300 rounded-lg"
+                      step="0.1"
+                      min="1"
+                      value={heightCm}
+                      onChange={(e) => setHeightCm(Math.max(0.5, parseFloat(e.target.value) || 0.5))}
+                      className="w-full px-3 py-2 text-sm font-mono font-bold bg-white border border-slate-300 rounded-lg"
                     />
                   </div>
 
@@ -631,7 +628,7 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                     />
                   </div>
                   <div className="text-[11px] font-mono text-slate-400">
-                    Valor unitário: {formatBRL(activeUnitPrice)} / unidade
+                    Tamanho: {widthCm} x {heightCm} cm · Unitário: {formatBRL(activeUnitPrice)} / un
                   </div>
                 </div>
               </div>

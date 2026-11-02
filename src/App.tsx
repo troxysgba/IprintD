@@ -107,6 +107,26 @@ export default function App() {
     showToast(`Insumo "${newMat.name}" cadastrado com sucesso!`);
   };
 
+  const handleUpdateMaterial = (updatedMat: Material) => {
+    const all = StorageService.getMaterials();
+    const idx = all.findIndex((m) => m.id === updatedMat.id);
+    if (idx !== -1) {
+      all[idx] = updatedMat;
+      StorageService.saveMaterials(all);
+      refreshData();
+      showToast(`Insumo "${updatedMat.name}" atualizado com sucesso!`);
+    }
+  };
+
+  const handleDeleteMaterial = (materialId: string) => {
+    const all = StorageService.getMaterials();
+    const matToDelete = all.find((m) => m.id === materialId);
+    const updated = all.filter((m) => m.id !== materialId);
+    StorageService.saveMaterials(updated);
+    refreshData();
+    showToast(`Insumo "${matToDelete?.name || ''}" excluído com sucesso.`);
+  };
+
   const handleRecordStockMovement = (
     materialId: string,
     type: 'entrada' | 'saida_manual' | 'ajuste',
@@ -198,6 +218,8 @@ export default function App() {
             materials={materials}
             movements={movements}
             onAddMaterial={handleAddMaterial}
+            onUpdateMaterial={handleUpdateMaterial}
+            onDeleteMaterial={handleDeleteMaterial}
             onRecordMovement={handleRecordStockMovement}
           />
         )}

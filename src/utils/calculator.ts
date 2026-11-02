@@ -1,5 +1,6 @@
 /**
  * Motor de Cálculo de Custo e Orçamento Gráfico
+ * Todas as medidas operam em Centímetros (cm)
  */
 
 export interface NestingResult {
@@ -10,38 +11,45 @@ export interface NestingResult {
   wastePercent: number;
 }
 
-// Folha padrão para gráfica rápida digital: SRA3 (330x480mm, área imprimível 310x460mm)
+// Folha padrão para gráfica rápida digital: SRA3 (33 x 48 cm, área imprimível útil 31 x 46 cm)
 export const SRA3_SHEET = {
-  widthMm: 330,
-  heightMm: 480,
-  printableWidthMm: 310,
-  printableHeightMm: 460,
+  widthCm: 33,
+  heightCm: 48,
+  printableWidthCm: 31,
+  printableHeightCm: 46,
 };
 
 /**
- * Calcula quantos itens cabem em uma folha SRA3 com 2mm de sangria
+ * Calcula quantos itens cabem em uma folha SRA3 com 0,2 cm (2mm) de sangria
+ * @param itemWidthCm Largura do item em centímetros (cm)
+ * @param itemHeightCm Altura do item em centímetros (cm)
+ * @param bleedCm Sangria técnica em centímetros (padrão 0.2 cm)
  */
 export function calculateSheetNesting(
-  itemWidthMm: number,
-  itemHeightMm: number,
-  bleedMm: number = 2
+  itemWidthCm: number,
+  itemHeightCm: number,
+  bleedCm: number = 0.2
 ): NestingResult {
-  const fullW = Math.max(10, itemWidthMm + bleedMm * 2);
-  const fullH = Math.max(10, itemHeightMm + bleedMm * 2);
+  const safeW = Math.max(1, itemWidthCm);
+  const safeH = Math.max(1, itemHeightCm);
 
-  // Direta
-  const colsDirect = Math.floor(SRA3_SHEET.printableWidthMm / fullW);
-  const rowsDirect = Math.floor(SRA3_SHEET.printableHeightMm / fullH);
+  const fullW = safeW + bleedCm * 2;
+  const fullH = safeH + bleedCm * 2;
+
+  // Orientação direta
+  const colsDirect = Math.floor(SRA3_SHEET.printableWidthCm / fullW);
+  const rowsDirect = Math.floor(SRA3_SHEET.printableHeightCm / fullH);
   const totalDirect = Math.max(1, colsDirect * rowsDirect);
 
-  // Girada 90º
-  const colsRotated = Math.floor(SRA3_SHEET.printableWidthMm / fullH);
-  const rowsRotated = Math.floor(SRA3_SHEET.printableHeightMm / fullW);
+  // Orientação girada 90º
+  const colsRotated = Math.floor(SRA3_SHEET.printableWidthCm / fullH);
+  const rowsRotated = Math.floor(SRA3_SHEET.printableHeightCm / fullW);
   const totalRotated = Math.max(1, colsRotated * rowsRotated);
 
+  const totalArea = SRA3_SHEET.widthCm * SRA3_SHEET.heightCm;
+
   if (totalRotated > totalDirect) {
-    const usedArea = totalRotated * (itemWidthMm * itemHeightMm);
-    const totalArea = SRA3_SHEET.widthMm * SRA3_SHEET.heightMm;
+    const usedArea = totalRotated * (safeW * safeH);
     const waste = Math.max(0, Math.min(95, ((totalArea - usedArea) / totalArea) * 100));
     return {
       orientation: 'girada',
@@ -52,8 +60,7 @@ export function calculateSheetNesting(
     };
   }
 
-  const usedArea = totalDirect * (itemWidthMm * itemHeightMm);
-  const totalArea = SRA3_SHEET.widthMm * SRA3_SHEET.heightMm;
+  const usedArea = totalDirect * (safeW * safeH);
   const waste = Math.max(0, Math.min(95, ((totalArea - usedArea) / totalArea) * 100));
   return {
     orientation: 'direta',
@@ -83,8 +90,8 @@ export interface CostCalculationResult {
 
 export function calculateOrderCost(params: {
   quantity: number;
-  widthMm: number;
-  heightMm: number;
+  widthCm: number;
+  heightCm: number;
   printSides: '4x0' | '4x4' | '1x0' | '1x1';
   costPerSheetOrM2: number;
   isPlotterM2?: boolean;
@@ -96,8 +103,8 @@ export function calculateOrderCost(params: {
 }): CostCalculationResult {
   const {
     quantity,
-    widthMm,
-    heightMm,
+    widthCm,
+    heightCm,
     printSides,
     costPerSheetOrM2,
     isPlotterM2,
@@ -116,9 +123,10 @@ export function calculateOrderCost(params: {
   let clickCost = 0;
 
   if (isPlotterM2) {
-    const unitAreaM2 = (widthMm / 1000) * (heightMm / 1000);
+    // Cálculo em metros quadrados a partir de centímetros: (L cm / 100) * (A cm / 100)
+    const unitAreaM2 = (widthCm / 100) * (heightCm / 100);
     const totalAreaM2 = unitAreaM2 * quantity;
-    const billedAreaM2 = Math.max(0.25, totalAreaM2 * 1.05); // 5% perda
+    const billedAreaM2 = Math.max(0.25, totalAreaM2 * 1.05); // 5% de margem técnica
     itemsPerSheet = 1;
     sheetsNeeded = Number(totalAreaM2.toFixed(2));
     wasteSheets = Number((billedAreaM2 - totalAreaM2).toFixed(2));
@@ -126,7 +134,7 @@ export function calculateOrderCost(params: {
     materialCost = totalSheetsToConsume * costPerSheetOrM2;
     clickCost = billedAreaM2 * (clickCostColor > 0 ? clickCostColor : 14.0);
   } else {
-    const nesting = calculateSheetNesting(widthMm, heightMm);
+    const nesting = calculateSheetNesting(widthCm, heightCm);
     itemsPerSheet = nesting.itemsPerSheet;
     sheetsNeeded = Math.ceil(quantity / itemsPerSheet);
     wasteSheets = Math.max(2, Math.ceil(sheetsNeeded * 0.05)); // 5% de quebra (mínimo 2 folhas de acerto)
@@ -200,14 +208,14 @@ export function formatDate(dateStr: string): string {
 }
 
 /**
- * Gera mensagem formatada pronta para enviar no WhatsApp
+ * Gera mensagem formatada pronta para enviar no WhatsApp com medidas em Centímetros (cm)
  */
 export function generateWhatsAppMessage(params: {
   clientName: string;
   productName: string;
   quantity: number;
-  widthMm: number;
-  heightMm: number;
+  widthCm: number;
+  heightCm: number;
   printSides: string;
   materialName: string;
   totalPrice: number;
@@ -218,8 +226,8 @@ export function generateWhatsAppMessage(params: {
     clientName,
     productName,
     quantity,
-    widthMm,
-    heightMm,
+    widthCm,
+    heightCm,
     printSides,
     materialName,
     totalPrice,
@@ -232,8 +240,8 @@ export function generateWhatsAppMessage(params: {
     `Olá, *${clientName || 'Cliente'}*! Segue a cotação solicitada:\n\n` +
     `📌 *Item:* ${productName}\n` +
     `🔢 *Quantidade:* ${quantity.toLocaleString('pt-BR')} unidades\n` +
-    `📏 *Formato:* ${widthMm}x${heightMm} mm (${printSides})\n` +
-    `📄 *Papel/Material:* ${materialName}\n` +
+    `📏 *Tamanho / Formato:* ${widthCm} x ${heightCm} cm (${printSides})\n` +
+    `📄 *Papel / Material:* ${materialName}\n` +
     (notes ? `📝 *Observações:* ${notes}\n` : '') +
     `\n` +
     `💰 *Valor Total:* ${formatBRL(totalPrice)}\n` +

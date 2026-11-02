@@ -9,10 +9,6 @@ import {
 import {
   ArrowRight,
   CheckCircle2,
-  Clock,
-  ExternalLink,
-  FileText,
-  Filter,
   MessageSquare,
   Package,
   PlusCircle,
@@ -89,8 +85,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       clientName: order.clientName,
       productName: order.productName,
       quantity: order.quantity,
-      widthMm: order.widthMm,
-      heightMm: order.heightMm,
+      widthCm: order.widthCm,
+      heightCm: order.heightCm,
       printSides: order.printSides,
       materialName: order.materialName,
       totalPrice: order.finalPrice,
@@ -111,7 +107,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               Gestão de Pedidos & Ordens de Serviço
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Fila de impressão, prazos de entrega, status de pagamentos e envio rápido pelo WhatsApp.
+              Fila de impressão, medidas em centímetros (cm), pagamentos e envio pelo WhatsApp.
             </p>
           </div>
 
@@ -231,7 +227,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {/* Payment dropdown */}
                     <span className="text-slate-400 text-[10px] uppercase">Pagamento:</span>
                     <select
                       value={ord.paymentStatus}
@@ -251,7 +246,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   </div>
                 </div>
 
-                {/* Body row: Client, Product specs and Financials */}
+                {/* Body row: Client, Product specs in CM and Financials */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
                   <div className="sm:col-span-8 space-y-1">
                     <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
@@ -274,7 +269,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                     </div>
 
                     <div className="text-[11px] text-slate-500 flex flex-wrap gap-2">
-                      <span>Formato: {ord.widthMm}x{ord.heightMm}mm ({ord.printSides})</span>
+                      <span className="font-bold text-slate-700">Tamanho: {ord.widthCm} x {ord.heightCm} cm</span>
+                      <span>({ord.printSides})</span>
                       <span>·</span>
                       <span>Material: {ord.materialName}</span>
                       <span>·</span>
@@ -305,7 +301,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                     <button
                       onClick={() => onViewJobTicket(ord)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition-colors cursor-pointer"
-                      title="Ver e Imprimir Comanda de Produção para o operador da gráfica"
+                      title="Ver e Imprimir Comanda de Produção com medidas em cm"
                     >
                       <Printer className="w-3.5 h-3.5 text-slate-700" />
                       <span>Comanda de Produção</span>
