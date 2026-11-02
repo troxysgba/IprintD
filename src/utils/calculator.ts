@@ -346,17 +346,17 @@ export function calculateOrderCost(params: {
 
     const buildTier = (markup: number): PriceTier => {
       const raw = totalCost * (1 + markup / 100);
-      const basePrice = Math.max(15, Math.ceil(raw));
+      const basePrice = Math.max(0, Number(raw.toFixed(2)));
       const inkCost = Number((basePrice * (inkPercent / 100)).toFixed(2));
       const depreciationCost = Number((basePrice * (depreciationPercent / 100)).toFixed(2));
       const price = Number((basePrice + inkCost + depreciationCost).toFixed(2));
       const unitPrice = quantity > 0 ? Number((price / quantity).toFixed(3)) : 0;
-      const profit = Number((price - totalCost).toFixed(2));
+      const profit = Number((basePrice - totalCost).toFixed(2));
       return { markup, basePrice, inkCost, depreciationCost, price, unitPrice, profit };
     };
 
-    const recMarkup = Math.max(40, markupPercent);
-    const minMarkup = Math.max(25, Math.round(recMarkup * 0.7));
+    const recMarkup = markupPercent;
+    const minMarkup = Math.max(0, Math.round(recMarkup * 0.7));
     const premMarkup = Math.round(recMarkup * 1.4);
 
     const minTier = buildTier(minMarkup);
@@ -424,17 +424,17 @@ export function calculateOrderCost(params: {
 
   const buildTier = (markup: number): PriceTier => {
     const raw = totalCost * (1 + markup / 100);
-    const basePrice = Math.max(15, Math.ceil(raw));
+    const basePrice = Math.max(0, Number(raw.toFixed(2)));
     const inkCost = Number((basePrice * (inkPercent / 100)).toFixed(2));
     const depreciationCost = Number((basePrice * (depreciationPercent / 100)).toFixed(2));
     const price = Number((basePrice + inkCost + depreciationCost).toFixed(2));
     const unitPrice = quantity > 0 ? Number((price / quantity).toFixed(3)) : 0;
-    const profit = Number((price - totalCost).toFixed(2));
+    const profit = Number((basePrice - totalCost).toFixed(2));
     return { markup, basePrice, inkCost, depreciationCost, price, unitPrice, profit };
   };
 
-  const recMarkup = Math.max(40, markupPercent);
-  const minMarkup = Math.max(25, Math.round(recMarkup * 0.7));
+  const recMarkup = markupPercent;
+  const minMarkup = Math.max(0, Math.round(recMarkup * 0.7));
   const premMarkup = Math.round(recMarkup * 1.4);
 
   const minTier = buildTier(minMarkup);

@@ -207,6 +207,7 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
       depreciationCost: costResult.depreciationCost,
       depreciationPercent: costResult.depreciationPercent,
       totalCost: costResult.totalCost,
+      markupPercent,
       suggestedPrice: costResult.suggestedPrices.recommended.price,
       finalPrice: costResult.suggestedPrices.recommended.price,
       unitPrice: costResult.suggestedPrices.recommended.unitPrice,
@@ -828,64 +829,156 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
                   </div>
                 </div>
 
-                {/* Markup Slider */}
+                {/* Markup Controls */}
                 <div className="pt-3 border-t border-slate-100 space-y-3">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
                       <Percent className="w-3.5 h-3.5 text-amber-500" />
                       Margem de Lucro Desejada:
                     </span>
-                    <span className="font-mono font-bold text-amber-700 text-sm">
-                      {markupPercent}%
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="0"
+                        max="1000"
+                        step="5"
+                        value={markupPercent}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          setMarkupPercent(isNaN(val) ? 0 : Math.max(0, val));
+                        }}
+                        className="w-18 px-2 py-1 text-right font-mono font-bold text-amber-900 text-sm bg-amber-50 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                      <span className="font-bold text-amber-800 text-xs">%</span>
+                    </div>
                   </div>
 
                   <input
                     type="range"
-                    min="30"
-                    max="250"
+                    min="0"
+                    max="300"
                     step="5"
                     value={markupPercent}
-                    onChange={(e) => setMarkupPercent(parseInt(e.target.value) || 100)}
+                    onChange={(e) => setMarkupPercent(Math.max(0, parseInt(e.target.value) || 0))}
                     className="w-full accent-amber-500 cursor-pointer"
                   />
 
+                  {/* Atalhos Rápidos de Margem */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase">Atalhos:</span>
+                    {[30, 50, 70, 100, 120, 150, 200].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setMarkupPercent(m)}
+                        className={`px-2 py-0.5 text-[11px] font-mono font-bold rounded-md transition-all cursor-pointer ${
+                          markupPercent === m
+                            ? 'bg-amber-500 text-slate-950 shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                        }`}
+                      >
+                        {m}%
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 3 Níveis Sugeridos Clicáveis */}
                   <div className="grid grid-cols-3 gap-2 pt-1">
-                    <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-left">
-                      <div className="text-[10px] text-slate-500 font-bold uppercase">
+                    <button
+                      type="button"
+                      onClick={() => setMarkupPercent(costResult.suggestedPrices.min.markup)}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        markupPercent === costResult.suggestedPrices.min.markup
+                          ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 bg-slate-50 text-slate-900'
+                      }`}
+                    >
+                      <div
+                        className={`text-[10px] font-bold uppercase ${
+                          markupPercent === costResult.suggestedPrices.min.markup
+                            ? 'text-slate-300'
+                            : 'text-slate-500'
+                        }`}
+                      >
                         Econômico
                       </div>
-                      <div className="text-xs font-bold font-mono text-slate-900">
+                      <div className="text-xs font-bold font-mono mt-0.5">
                         {formatBRL(costResult.suggestedPrices.min.price)}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
+                      <div
+                        className={`text-[10px] font-mono mt-0.5 ${
+                          markupPercent === costResult.suggestedPrices.min.markup
+                            ? 'text-amber-400 font-bold'
+                            : 'text-slate-400'
+                        }`}
+                      >
                         +{costResult.suggestedPrices.min.markup}% margem
                       </div>
-                    </div>
+                    </button>
 
-                    <div className="p-2.5 rounded-xl border border-amber-300 bg-amber-50/80 text-left">
-                      <div className="text-[10px] text-amber-800 font-bold uppercase flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setMarkupPercent(costResult.suggestedPrices.recommended.markup)}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
+                        markupPercent === costResult.suggestedPrices.recommended.markup
+                          ? 'border-amber-500 bg-amber-500 text-slate-950 font-bold shadow-xs'
+                          : 'border-amber-300 hover:border-amber-400 bg-amber-50/80 text-slate-900'
+                      }`}
+                    >
+                      <div
+                        className={`text-[10px] font-bold uppercase flex items-center gap-0.5 ${
+                          markupPercent === costResult.suggestedPrices.recommended.markup
+                            ? 'text-slate-950'
+                            : 'text-amber-800'
+                        }`}
+                      >
                         <Sparkles className="w-2.5 h-2.5" /> Recomendado
                       </div>
-                      <div className="text-xs font-bold font-mono text-slate-900">
+                      <div className="text-xs font-bold font-mono mt-0.5">
                         {formatBRL(costResult.suggestedPrices.recommended.price)}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
+                      <div
+                        className={`text-[10px] font-mono mt-0.5 ${
+                          markupPercent === costResult.suggestedPrices.recommended.markup
+                            ? 'text-slate-900'
+                            : 'text-slate-500'
+                        }`}
+                      >
                         +{costResult.suggestedPrices.recommended.markup}% margem
                       </div>
-                    </div>
+                    </button>
 
-                    <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-left">
-                      <div className="text-[10px] text-slate-500 font-bold uppercase">
+                    <button
+                      type="button"
+                      onClick={() => setMarkupPercent(costResult.suggestedPrices.premium.markup)}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        markupPercent === costResult.suggestedPrices.premium.markup
+                          ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 bg-slate-50 text-slate-900'
+                      }`}
+                    >
+                      <div
+                        className={`text-[10px] font-bold uppercase ${
+                          markupPercent === costResult.suggestedPrices.premium.markup
+                            ? 'text-slate-300'
+                            : 'text-slate-500'
+                        }`}
+                      >
                         Alta Margem
                       </div>
-                      <div className="text-xs font-bold font-mono text-slate-900">
+                      <div className="text-xs font-bold font-mono mt-0.5">
                         {formatBRL(costResult.suggestedPrices.premium.price)}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
+                      <div
+                        className={`text-[10px] font-mono mt-0.5 ${
+                          markupPercent === costResult.suggestedPrices.premium.markup
+                            ? 'text-amber-400 font-bold'
+                            : 'text-slate-400'
+                        }`}
+                      >
                         +{costResult.suggestedPrices.premium.markup}% margem
                       </div>
-                    </div>
+                    </button>
                   </div>
                 </div>
 

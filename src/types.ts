@@ -52,6 +52,7 @@ export interface Order {
   depreciationCost?: number; // Depreciação de máquina
   depreciationPercent?: number; // % depreciação da máquina (padrão 10%)
   totalCost: number;
+  markupPercent?: number;
   suggestedPrice: number;
   finalPrice: number;
   unitPrice: number;

@@ -154,6 +154,7 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       if (initialOrderData.equipmentId) setSelectedEquipmentId(initialOrderData.equipmentId);
       if (initialOrderData.hasDelivery !== undefined) setHasDelivery(initialOrderData.hasDelivery);
       if (initialOrderData.deliveryAddress) setDeliveryAddress(initialOrderData.deliveryAddress);
+      if (initialOrderData.markupPercent) setMarkupPercent(initialOrderData.markupPercent);
       if (initialOrderData.finalPrice) setCustomFinalPrice(initialOrderData.finalPrice);
     }
   }, [initialOrderData]);
@@ -914,78 +915,102 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                 </div>
 
                 {costResult && (
-                  <div className="grid grid-cols-3 gap-2">
-                    {/* Econômico */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMarkupPercent(35);
-                        setCustomFinalPrice(null);
-                      }}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                        markupPercent === 35 && customFinalPrice === null
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-200 hover:border-slate-300 bg-slate-50/60'
-                      }`}
-                    >
-                      <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">
-                        Econômico
-                      </div>
-                      <div className="text-sm font-black font-mono mt-0.5">
-                        {formatBRL(costResult.suggestedPrices.min.price)}
-                      </div>
-                      <div className="text-[10px] opacity-75 mt-0.5">
-                        {formatBRL(costResult.suggestedPrices.min.unitPrice)}/un
-                      </div>
-                    </button>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      {/* Econômico */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMarkupPercent(costResult.suggestedPrices.min.markup);
+                          setCustomFinalPrice(null);
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          markupPercent === costResult.suggestedPrices.min.markup && customFinalPrice === null
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-200 hover:border-slate-300 bg-slate-50/60'
+                        }`}
+                      >
+                        <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">
+                          Econômico
+                        </div>
+                        <div className="text-sm font-black font-mono mt-0.5">
+                          {formatBRL(costResult.suggestedPrices.min.price)}
+                        </div>
+                        <div className="text-[10px] opacity-75 mt-0.5">
+                          +{costResult.suggestedPrices.min.markup}% margem
+                        </div>
+                      </button>
 
-                    {/* Recomendado */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMarkupPercent(70);
-                        setCustomFinalPrice(null);
-                      }}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
-                        markupPercent === 70 && customFinalPrice === null
-                          ? 'border-amber-500 bg-amber-500 text-slate-950 font-bold'
-                          : 'border-amber-200 hover:border-amber-400 bg-amber-50/50'
-                      }`}
-                    >
-                      <div className="text-[10px] font-black uppercase tracking-wider text-amber-900">
-                        Recomendado
-                      </div>
-                      <div className="text-sm font-black font-mono mt-0.5">
-                        {formatBRL(costResult.suggestedPrices.recommended.price)}
-                      </div>
-                      <div className="text-[10px] opacity-80 mt-0.5">
-                        {formatBRL(costResult.suggestedPrices.recommended.unitPrice)}/un
-                      </div>
-                    </button>
+                      {/* Recomendado */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMarkupPercent(costResult.suggestedPrices.recommended.markup);
+                          setCustomFinalPrice(null);
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
+                          markupPercent === costResult.suggestedPrices.recommended.markup && customFinalPrice === null
+                            ? 'border-amber-500 bg-amber-500 text-slate-950 font-bold'
+                            : 'border-amber-200 hover:border-amber-400 bg-amber-50/50'
+                        }`}
+                      >
+                        <div className="text-[10px] font-black uppercase tracking-wider text-amber-900">
+                          Recomendado
+                        </div>
+                        <div className="text-sm font-black font-mono mt-0.5">
+                          {formatBRL(costResult.suggestedPrices.recommended.price)}
+                        </div>
+                        <div className="text-[10px] opacity-80 mt-0.5">
+                          +{costResult.suggestedPrices.recommended.markup}% margem
+                        </div>
+                      </button>
 
-                    {/* Alta Margem */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMarkupPercent(120);
-                        setCustomFinalPrice(null);
-                      }}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                        markupPercent === 120 && customFinalPrice === null
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-200 hover:border-slate-300 bg-slate-50/60'
-                      }`}
-                    >
-                      <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">
-                        Alta Margem
-                      </div>
-                      <div className="text-sm font-black font-mono mt-0.5">
-                        {formatBRL(costResult.suggestedPrices.premium.price)}
-                      </div>
-                      <div className="text-[10px] opacity-75 mt-0.5">
-                        {formatBRL(costResult.suggestedPrices.premium.unitPrice)}/un
-                      </div>
-                    </button>
+                      {/* Alta Margem */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMarkupPercent(costResult.suggestedPrices.premium.markup);
+                          setCustomFinalPrice(null);
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          markupPercent === costResult.suggestedPrices.premium.markup && customFinalPrice === null
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-200 hover:border-slate-300 bg-slate-50/60'
+                        }`}
+                      >
+                        <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">
+                          Alta Margem
+                        </div>
+                        <div className="text-sm font-black font-mono mt-0.5">
+                          {formatBRL(costResult.suggestedPrices.premium.price)}
+                        </div>
+                        <div className="text-[10px] opacity-75 mt-0.5">
+                          +{costResult.suggestedPrices.premium.markup}% margem
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Atalhos Rápidos de Margem no Modal */}
+                    <div className="flex flex-wrap items-center gap-1 pt-1">
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase">Margem:</span>
+                      {[30, 50, 70, 100, 120, 150, 200].map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => {
+                            setMarkupPercent(m);
+                            setCustomFinalPrice(null);
+                          }}
+                          className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded transition-all cursor-pointer ${
+                            markupPercent === m && customFinalPrice === null
+                              ? 'bg-amber-500 text-slate-950 shadow-xs'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          {m}%
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 
