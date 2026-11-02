@@ -3,6 +3,7 @@ import { Equipment, Material, Order, QuickProductPreset, SheetType } from '../ty
 import {
   calculateOrderCost,
   formatBRL,
+  formatPrintSides,
   generateWhatsAppLink,
   generateWhatsAppMessage,
 } from '../utils/calculator';
@@ -789,10 +790,10 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                       onChange={(e) => setPrintSides(e.target.value as any)}
                       className="w-full px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg"
                     >
-                      <option value="4x0">FRENTE, COLORIDA.</option>
-                      <option value="4x4">FRENTE & VERSO, COLORIDA.</option>
-                      <option value="1x0">FRENTE, PRETO & BRANCO.</option>
-                      <option value="1x1">FRENTE & VERSO, PRETO & BRANCO.</option>
+                      <option value="4x0">FRENTE, COLORIDA</option>
+                      <option value="4x4">FRENTE & VERSO, COLORIDA</option>
+                      <option value="1x0">FRENTE, PRETO & BRANCO</option>
+                      <option value="1x1">FRENTE & VERSO, PRETO & BRANCO</option>
                     </select>
                   </div>
                 </div>
@@ -1221,10 +1222,10 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                     onChange={(e) => setNewPresetSides(e.target.value as any)}
                     className="w-full px-3 py-2 font-semibold bg-slate-50 border border-slate-200 rounded-lg"
                   >
-                    <option value="4x0">FRENTE, COLORIDA.</option>
-                    <option value="4x4">FRENTE & VERSO, COLORIDA.</option>
-                    <option value="1x0">FRENTE, PRETO & BRANCO.</option>
-                    <option value="1x1">FRENTE & VERSO, PRETO & BRANCO.</option>
+                    <option value="4x0">FRENTE, COLORIDA</option>
+                    <option value="4x4">FRENTE & VERSO, COLORIDA</option>
+                    <option value="1x0">FRENTE, PRETO & BRANCO</option>
+                    <option value="1x1">FRENTE & VERSO, PRETO & BRANCO</option>
                   </select>
                 </div>
                 <div>
@@ -1375,10 +1376,10 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                     onChange={(e) => setEditPresetSides(e.target.value as any)}
                     className="w-full px-3 py-2 font-semibold bg-slate-50 border border-slate-200 rounded-lg"
                   >
-                    <option value="4x0">FRENTE, COLORIDA.</option>
-                    <option value="4x4">FRENTE & VERSO, COLORIDA.</option>
-                    <option value="1x0">FRENTE, PRETO & BRANCO.</option>
-                    <option value="1x1">FRENTE & VERSO, PRETO & BRANCO.</option>
+                    <option value="4x0">FRENTE, COLORIDA</option>
+                    <option value="4x4">FRENTE & VERSO, COLORIDA</option>
+                    <option value="1x0">FRENTE, PRETO & BRANCO</option>
+                    <option value="1x1">FRENTE & VERSO, PRETO & BRANCO</option>
                   </select>
                 </div>
                 <div>
@@ -1460,7 +1461,7 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 my-4 text-xs space-y-1">
               <div className="font-bold text-slate-900">{presetToDelete.label}</div>
               <div className="text-slate-500 font-mono">
-                {presetToDelete.widthCm}x{presetToDelete.heightCm} cm · {presetToDelete.printSides} · {presetToDelete.quantity} un
+                {presetToDelete.widthCm}x{presetToDelete.heightCm} cm · {formatPrintSides(presetToDelete.printSides)} · {presetToDelete.quantity} un
               </div>
             </div>
 
@@ -1538,7 +1539,7 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                           {p.widthCm} x {p.heightCm} cm
                         </span>
                         <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
-                          {p.printSides}
+                          {formatPrintSides(p.printSides)}
                         </span>
                         <span className="text-[10px] font-medium text-sky-800 bg-sky-50 border border-sky-200/60 px-2 py-0.5 rounded">
                           🖨️ {assignedEq ? assignedEq.name : 'Impressora Padrão'}

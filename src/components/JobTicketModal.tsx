@@ -1,6 +1,6 @@
 import React from 'react';
 import { Order } from '../types';
-import { formatBRL, formatDate } from '../utils/calculator';
+import { formatBRL, formatDate, formatPrintSides } from '../utils/calculator';
 import { Printer, X } from 'lucide-react';
 
 interface JobTicketModalProps {
@@ -140,7 +140,7 @@ export const JobTicketModal: React.FC<JobTicketModalProps> = ({ order, onClose }
                   Corte / Cores
                 </span>
                 <span className="font-bold text-slate-900">
-                  {order.widthCm}×{order.heightCm} cm ({order.printSides})
+                  {order.widthCm}×{order.heightCm} cm ({formatPrintSides(order.printSides)})
                 </span>
               </div>
 

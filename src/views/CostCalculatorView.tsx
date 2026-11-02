@@ -4,6 +4,7 @@ import {
   calculateOrderCost,
   calculateSheetNesting,
   formatBRL,
+  formatPrintSides,
   SHEET_FORMATS,
 } from '../utils/calculator';
 import {
@@ -231,7 +232,7 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
 
     const text =
       `*Orçamento Gráfico - IprintDesginer*\n` +
-      `📦 Item: ${widthCm} x ${heightCm} cm (${printSides || '-'})\n` +
+      `📦 Item: ${widthCm} x ${heightCm} cm (${formatPrintSides(printSides) || '-'})\n` +
       `🔢 Quantidade: ${Number(quantity).toLocaleString('pt-BR')} un\n` +
       `📄 Formato de Aproveitamento: ${mediaText}\n` +
       `📑 Substrato: ${selectedMaterial?.name || '-'}\n` +
@@ -550,10 +551,10 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
                 }`}
               >
                 <option value="">Selecione o tipo de impressão...</option>
-                <option value="4x0">FRENTE, COLORIDA.</option>
-                <option value="4x4">FRENTE & VERSO, COLORIDA.</option>
-                <option value="1x0">FRENTE, PRETO & BRANCO.</option>
-                <option value="1x1">FRENTE & VERSO, PRETO & BRANCO.</option>
+                <option value="4x0">FRENTE, COLORIDA</option>
+                <option value="4x4">FRENTE & VERSO, COLORIDA</option>
+                <option value="1x0">FRENTE, PRETO & BRANCO</option>
+                <option value="1x1">FRENTE & VERSO, PRETO & BRANCO</option>
               </select>
             </div>
 

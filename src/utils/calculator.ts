@@ -489,6 +489,45 @@ export function formatDate(dateStr: string): string {
   }
 }
 
+export function formatPrintSides(sides?: string): string {
+  if (!sides) return '-';
+  const clean = sides.trim();
+  const lower = clean.toLowerCase();
+
+  if (lower === '4x4' || lower === '4/4' || lower.includes('4x4')) {
+    return 'FRENTE & VERSO, COLORIDA';
+  }
+  if (lower === '4x0' || lower === '4/0' || lower.includes('4x0')) {
+    return 'FRENTE, COLORIDA';
+  }
+  if (lower === '1x1' || lower === '1/1' || lower.includes('1x1')) {
+    return 'FRENTE & VERSO, PRETO & BRANCO';
+  }
+  if (lower === '1x0' || lower === '1/0' || lower.includes('1x0')) {
+    return 'FRENTE, PRETO & BRANCO';
+  }
+
+  const upper = clean.toUpperCase();
+  if (upper.includes('FRENTE') && upper.includes('VERSO') && upper.includes('COLORID')) {
+    return 'FRENTE & VERSO, COLORIDA';
+  }
+  if (
+    upper.includes('FRENTE') &&
+    upper.includes('VERSO') &&
+    (upper.includes('PRETO') || upper.includes('BRANCO') || upper.includes('PB') || upper.includes('P&B'))
+  ) {
+    return 'FRENTE & VERSO, PRETO & BRANCO';
+  }
+  if (upper.includes('COLORID')) {
+    return 'FRENTE, COLORIDA';
+  }
+  if (upper.includes('PRETO') || upper.includes('BRANCO') || upper.includes('PB') || upper.includes('P&B')) {
+    return 'FRENTE, PRETO & BRANCO';
+  }
+
+  return clean.replace(/\.$/, '');
+}
+
 /**
  * Gera mensagem formatada pronta para enviar no WhatsApp com medidas em Centímetros (cm)
  */
@@ -534,7 +573,7 @@ export function generateWhatsAppMessage(params: {
     `Olá, *${clientName || 'Cliente'}*! Segue a cotação solicitada:\n\n` +
     `📌 *Item:* ${productName}\n` +
     `🔢 *Quantidade:* ${quantity.toLocaleString('pt-BR')} unidades\n` +
-    `📏 *Tamanho / Formato:* ${widthCm} x ${heightCm} cm (${printSides})\n` +
+    `📏 *Tamanho / Formato:* ${widthCm} x ${heightCm} cm (${formatPrintSides(printSides)})\n` +
     `📄 *Papel / Material:* ${materialName}\n` +
     (hasDelivery
       ? `🚚 *Entrega:* Sim (+ ${formatBRL(deliveryFee)})${deliveryAddress ? `\n📍 *Endereço:* ${deliveryAddress}` : ''}\n`

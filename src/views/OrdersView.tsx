@@ -3,6 +3,7 @@ import { Order, OrderStatus, PaymentStatus } from '../types';
 import {
   formatBRL,
   formatDate,
+  formatPrintSides,
   generateWhatsAppLink,
   generateWhatsAppMessage,
 } from '../utils/calculator';
@@ -291,7 +292,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
                     <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-2">
                       <span className="font-bold text-slate-700">Tamanho: {ord.widthCm} x {ord.heightCm} cm</span>
-                      <span>({ord.printSides})</span>
+                      <span className="font-medium text-slate-600">({formatPrintSides(ord.printSides)})</span>
                       {ord.sheetType && (
                         <span className="bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.2 rounded font-bold text-[10px]">
                           {ord.sheetType === 'bobina'
