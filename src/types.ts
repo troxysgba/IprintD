@@ -1,34 +1,29 @@
 export type OrderStatus =
   | 'orcamento'
   | 'aprovado'
-  | 'pre_impressao'
   | 'em_producao'
-  | 'acabamento'
   | 'pronto'
   | 'entregue'
   | 'cancelado';
 
 export type PaymentStatus = 'pendente' | 'parcial' | 'pago';
 
-export type PaymentMethod =
-  | 'pix'
-  | 'cartao_credito'
-  | 'cartao_debito'
-  | 'dinheiro'
-  | 'boleto'
-  | 'faturado';
+export type PaymentMethod = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'faturado';
 
-export interface FinishingOption {
+export interface Order {
   id: string;
-  name: string;
-  cost: number;
-  price: number;
-}
-
-export interface OrderItem {
-  id: string;
-  description: string;
-  productType: 'cartao' | 'panfleto' | 'folder' | 'banner' | 'adesivo' | 'livro_apostila' | 'outro';
+  code: string; // ex: OS-1042
+  type: 'pedido' | 'orcamento';
+  clientName: string;
+  clientPhone: string;
+  createdAt: string;
+  deadline: string;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod;
+  
+  // Item details
+  productName: string;
   quantity: number;
   widthMm: number;
   heightMm: number;
@@ -37,62 +32,32 @@ export interface OrderItem {
   materialName: string;
   equipmentId: string;
   equipmentName: string;
-  sheetFormat: 'SRA3' | 'A3' | 'A4' | 'Bobina_m2';
+  
+  // Imposition & Technical
   itemsPerSheet: number;
   sheetsNeeded: number;
   wasteSheets: number;
+  
+  // Financials
   materialCost: number;
-  printClickCost: number;
-  finishingsCost: number;
-  laborAndDepreciationCost: number;
-  totalProductionCost: number;
-  suggestedMarginPercent: number;
-  unitPrice: number;
-  totalPrice: number;
-  finishings: FinishingOption[];
-  fileNotes?: string;
-}
-
-export interface Order {
-  id: string;
-  code: string; // e.g. OS-2026-0142
-  type: 'pedido' | 'orcamento';
-  clientName: string;
-  clientDoc: string; // CPF or CNPJ
-  clientPhone: string;
-  clientEmail: string;
-  createdAt: string;
-  deadline: string;
-  status: OrderStatus;
-  paymentStatus: PaymentStatus;
-  paymentMethod: PaymentMethod;
-  amountPaid: number;
-  items: OrderItem[];
-  subtotal: number;
-  discount: number;
-  total: number;
+  clickCost: number;
+  machineLaborCost: number;
   totalCost: number;
-  profitEstimate: number;
-  notes: string;
-  hasNfIssued: boolean;
-  invoiceId?: string;
-  invoiceNumber?: number;
-  stockDeducted: boolean;
+  suggestedPrice: number;
+  finalPrice: number;
+  unitPrice: number;
+  notes?: string;
+  stockDeducted?: boolean;
 }
 
-export type MaterialCategory =
-  | 'papel_folha'
-  | 'bobina_plotter'
-  | 'tinta_toner'
-  | 'acabamento'
-  | 'embalagem';
+export type MaterialCategory = 'papel' | 'adesivo' | 'lona' | 'acabamento' | 'tinta';
 
 export interface Material {
   id: string;
   code: string;
   name: string;
   category: MaterialCategory;
-  unit: 'folha' | 'm2' | 'unidade' | 'pct' | 'bobina' | 'litro';
+  unit: 'folha' | 'm2' | 'unidade' | 'pct';
   widthMm?: number;
   heightMm?: number;
   grammage?: number;
@@ -100,22 +65,18 @@ export interface Material {
   minStock: number;
   costPerUnit: number;
   supplier: string;
-  lastPurchaseDate: string;
 }
 
 export interface Equipment {
   id: string;
   code: string;
   name: string;
-  category: 'impressora_laser' | 'plotter_comunicacao' | 'guilhotina' | 'laminadora' | 'encadernadora' | 'corte_digital';
-  clickCostPB: number; // R$ por clique PB
-  clickCostColor: number; // R$ por clique Color
-  hourlyRate: number; // Custo hora operacional (R$/h)
-  speedPerHour: number; // Folhas/h ou m²/h
-  maxSheetWidthMm: number;
-  maxSheetHeightMm: number;
-  status: 'operacional' | 'manutencao' | 'ocioso';
-  maintenanceCostMonthly: number;
+  category: 'laser' | 'plotter' | 'acabamento';
+  clickCostPB: number;
+  clickCostColor: number;
+  hourlyRate: number;
+  speedPerHour: number; // un/h ou m²/h
+  status: 'operacional' | 'manutencao';
 }
 
 export interface StockMovement {
@@ -131,48 +92,4 @@ export interface StockMovement {
   notes: string;
 }
 
-export interface Invoice {
-  id: string;
-  number: number;
-  series: number;
-  type: 'NFS-e' | 'NF-e' | 'NFC-e';
-  accessKey: string;
-  orderId: string;
-  orderCode: string;
-  clientName: string;
-  clientDoc: string;
-  clientAddress: string;
-  issueDate: string;
-  servicesDescription: string;
-  totalAmount: number;
-  deductions: number;
-  taxableBase: number;
-  issRate: number;
-  issAmount: number;
-  pisRate: number;
-  pisAmount: number;
-  cofinsRate: number;
-  cofinsAmount: number;
-  netAmount: number;
-  status: 'autorizada' | 'cancelada' | 'processando';
-  protocol: string;
-  verificationCode: string;
-  xmlData: string;
-}
-
-export interface CompanySettings {
-  tradeName: string;
-  legalName: string;
-  cnpj: string;
-  ie: string;
-  im: string;
-  phone: string;
-  email: string;
-  address: string;
-  taxRegime: 'Simples Nacional' | 'MEI' | 'Lucro Presumido';
-  defaultIssRate: number;
-  defaultMarkupPercent: number;
-  technicalWastePercent: number; // % perda de papel (quebra)
-  autoIssueInvoiceOnFinish: boolean;
-  currency: string;
-}
+export type ActivePage = 'visao_geral' | 'pedidos' | 'calculo_custo' | 'estoque' | 'maquinas';

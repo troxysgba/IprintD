@@ -1,173 +1,111 @@
 /**
- * Motor de Cálculo Gráfico e Aproveitamento de Folha
+ * Motor de Cálculo de Custo e Orçamento Gráfico
  */
 
-export interface SheetDimensions {
-  name: string;
-  widthMm: number;
-  heightMm: number;
-  printableWidthMm: number;
-  printableHeightMm: number;
-}
-
-export const STANDARD_SHEETS: Record<string, SheetDimensions> = {
-  SRA3: {
-    name: 'SRA3 (330x480 mm)',
-    widthMm: 330,
-    heightMm: 480,
-    printableWidthMm: 310, // Margens de pinça e corte
-    printableHeightMm: 460,
-  },
-  A3: {
-    name: 'A3 (297x420 mm)',
-    widthMm: 297,
-    heightMm: 420,
-    printableWidthMm: 285,
-    printableHeightMm: 408,
-  },
-  A4: {
-    name: 'A4 (210x297 mm)',
-    widthMm: 210,
-    heightMm: 297,
-    printableWidthMm: 200,
-    printableHeightMm: 287,
-  },
-};
-
 export interface NestingResult {
-  orientation: 'direta' | 'girada' | 'mista';
+  orientation: 'direta' | 'girada';
   itemsPerSheet: number;
   cols: number;
   rows: number;
   wastePercent: number;
-  layoutVisual: {
-    sheetW: number;
-    sheetH: number;
-    itemW: number;
-    itemH: number;
-    cols: number;
-    rows: number;
-  };
 }
 
+// Folha padrão para gráfica rápida digital: SRA3 (330x480mm, área imprimível 310x460mm)
+export const SRA3_SHEET = {
+  widthMm: 330,
+  heightMm: 480,
+  printableWidthMm: 310,
+  printableHeightMm: 460,
+};
+
 /**
- * Calcula quantos itens cabem na folha (imposição/aproveitamento)
- * com sangria e margem de corte técnica.
+ * Calcula quantos itens cabem em uma folha SRA3 com 2mm de sangria
  */
 export function calculateSheetNesting(
   itemWidthMm: number,
   itemHeightMm: number,
-  sheetFormat: 'SRA3' | 'A3' | 'A4' = 'SRA3',
-  bleedMm: number = 2 // Sangria padrão de 2mm por lado
+  bleedMm: number = 2
 ): NestingResult {
-  const sheet = STANDARD_SHEETS[sheetFormat] || STANDARD_SHEETS['SRA3'];
-  const fullItemW = Math.max(10, itemWidthMm + bleedMm * 2);
-  const fullItemH = Math.max(10, itemHeightMm + bleedMm * 2);
+  const fullW = Math.max(10, itemWidthMm + bleedMm * 2);
+  const fullH = Math.max(10, itemHeightMm + bleedMm * 2);
 
-  // Opção 1: Orientação direta
-  const colsDirect = Math.floor(sheet.printableWidthMm / fullItemW);
-  const rowsDirect = Math.floor(sheet.printableHeightMm / fullItemH);
+  // Direta
+  const colsDirect = Math.floor(SRA3_SHEET.printableWidthMm / fullW);
+  const rowsDirect = Math.floor(SRA3_SHEET.printableHeightMm / fullH);
   const totalDirect = Math.max(1, colsDirect * rowsDirect);
 
-  // Opção 2: Orientação girada 90 graus
-  const colsRotated = Math.floor(sheet.printableWidthMm / fullItemH);
-  const rowsRotated = Math.floor(sheet.printableHeightMm / fullItemW);
+  // Girada 90º
+  const colsRotated = Math.floor(SRA3_SHEET.printableWidthMm / fullH);
+  const rowsRotated = Math.floor(SRA3_SHEET.printableHeightMm / fullW);
   const totalRotated = Math.max(1, colsRotated * rowsRotated);
 
   if (totalRotated > totalDirect) {
     const usedArea = totalRotated * (itemWidthMm * itemHeightMm);
-    const totalArea = sheet.widthMm * sheet.heightMm;
+    const totalArea = SRA3_SHEET.widthMm * SRA3_SHEET.heightMm;
     const waste = Math.max(0, Math.min(95, ((totalArea - usedArea) / totalArea) * 100));
-
     return {
       orientation: 'girada',
       itemsPerSheet: totalRotated,
       cols: colsRotated,
       rows: rowsRotated,
       wastePercent: Math.round(waste),
-      layoutVisual: {
-        sheetW: sheet.widthMm,
-        sheetH: sheet.heightMm,
-        itemW: itemHeightMm,
-        itemH: itemWidthMm,
-        cols: colsRotated,
-        rows: rowsRotated,
-      },
-    };
-  } else {
-    const usedArea = totalDirect * (itemWidthMm * itemHeightMm);
-    const totalArea = sheet.widthMm * sheet.heightMm;
-    const waste = Math.max(0, Math.min(95, ((totalArea - usedArea) / totalArea) * 100));
-
-    return {
-      orientation: 'direta',
-      itemsPerSheet: totalDirect,
-      cols: colsDirect,
-      rows: rowsDirect,
-      wastePercent: Math.round(waste),
-      layoutVisual: {
-        sheetW: sheet.widthMm,
-        sheetH: sheet.heightMm,
-        itemW: itemWidthMm,
-        itemH: itemHeightMm,
-        cols: colsDirect,
-        rows: rowsDirect,
-      },
     };
   }
+
+  const usedArea = totalDirect * (itemWidthMm * itemHeightMm);
+  const totalArea = SRA3_SHEET.widthMm * SRA3_SHEET.heightMm;
+  const waste = Math.max(0, Math.min(95, ((totalArea - usedArea) / totalArea) * 100));
+  return {
+    orientation: 'direta',
+    itemsPerSheet: totalDirect,
+    cols: colsDirect,
+    rows: rowsDirect,
+    wastePercent: Math.round(waste),
+  };
 }
 
-export interface ProductionCostCalculation {
+export interface CostCalculationResult {
   itemsPerSheet: number;
   sheetsNeeded: number;
   wasteSheets: number;
   totalSheetsToConsume: number;
   materialCost: number;
-  printClickCost: number;
-  finishingsCost: number;
-  laborAndDepreciationCost: number;
-  totalProductionCost: number;
-  unitProductionCost: number;
-  // Preços sugeridos para diferentes faixas
+  clickCost: number;
+  machineLaborCost: number;
+  totalCost: number;
+  unitCost: number;
   suggestedPrices: {
-    minMargin: { markup: number; price: number; unitPrice: number; profit: number };
+    min: { markup: number; price: number; unitPrice: number; profit: number };
     recommended: { markup: number; price: number; unitPrice: number; profit: number };
     premium: { markup: number; price: number; unitPrice: number; profit: number };
   };
 }
 
-/**
- * Calcula o custo total e o preço sugerido de venda
- */
-export function calculateProductionCost(params: {
+export function calculateOrderCost(params: {
   quantity: number;
-  itemWidthMm: number;
-  itemHeightMm: number;
+  widthMm: number;
+  heightMm: number;
   printSides: '4x0' | '4x4' | '1x0' | '1x1';
-  sheetFormat: 'SRA3' | 'A3' | 'A4' | 'Bobina_m2';
   costPerSheetOrM2: number;
+  isPlotterM2?: boolean;
   clickCostColor: number;
   clickCostPB: number;
-  equipmentHourlyRate: number;
-  speedPerHour: number;
-  wastePercent: number; // ex: 5% de quebra
-  targetMarkupPercent: number; // ex: 120%
-  finishingsTotalCost: number;
-}): ProductionCostCalculation {
+  machineHourlyRate: number;
+  machineSpeedPerHour: number;
+  markupPercent?: number;
+}): CostCalculationResult {
   const {
     quantity,
-    itemWidthMm,
-    itemHeightMm,
+    widthMm,
+    heightMm,
     printSides,
-    sheetFormat,
     costPerSheetOrM2,
+    isPlotterM2,
     clickCostColor,
     clickCostPB,
-    equipmentHourlyRate,
-    speedPerHour,
-    wastePercent,
-    targetMarkupPercent,
-    finishingsTotalCost,
+    machineHourlyRate,
+    machineSpeedPerHour,
+    markupPercent = 120,
   } = params;
 
   let itemsPerSheet = 1;
@@ -175,66 +113,50 @@ export function calculateProductionCost(params: {
   let wasteSheets = 0;
   let totalSheetsToConsume = 0;
   let materialCost = 0;
-  let printClickCost = 0;
+  let clickCost = 0;
 
-  if (sheetFormat === 'Bobina_m2') {
-    // Cálculo por metro quadrado (Plotter de Comunicação Visual)
-    const areaUnitM2 = (itemWidthMm / 1000) * (itemHeightMm / 1000);
-    const totalAreaM2 = areaUnitM2 * quantity;
-    const wasteFactor = 1 + (wastePercent || 5) / 100;
-    const billedAreaM2 = Math.max(0.25, totalAreaM2 * wasteFactor);
-
+  if (isPlotterM2) {
+    const unitAreaM2 = (widthMm / 1000) * (heightMm / 1000);
+    const totalAreaM2 = unitAreaM2 * quantity;
+    const billedAreaM2 = Math.max(0.25, totalAreaM2 * 1.05); // 5% perda
     itemsPerSheet = 1;
-    sheetsNeeded = Math.ceil(totalAreaM2 * 100) / 100;
-    wasteSheets = Math.ceil((billedAreaM2 - totalAreaM2) * 100) / 100;
-    totalSheetsToConsume = Math.ceil(billedAreaM2 * 100) / 100;
-
+    sheetsNeeded = Number(totalAreaM2.toFixed(2));
+    wasteSheets = Number((billedAreaM2 - totalAreaM2).toFixed(2));
+    totalSheetsToConsume = Number(billedAreaM2.toFixed(2));
     materialCost = totalSheetsToConsume * costPerSheetOrM2;
-    // Custo de tinta em plotter (ex: R$ 12 a R$ 25 por m²)
-    const inkCostPerM2 = clickCostColor > 0 ? clickCostColor : 12.0;
-    printClickCost = billedAreaM2 * inkCostPerM2;
+    clickCost = billedAreaM2 * (clickCostColor > 0 ? clickCostColor : 14.0);
   } else {
-    // Cálculo de folhas padrão SRA3/A3/A4
-    const nesting = calculateSheetNesting(itemWidthMm, itemHeightMm, sheetFormat);
+    const nesting = calculateSheetNesting(widthMm, heightMm);
     itemsPerSheet = nesting.itemsPerSheet;
-
     sheetsNeeded = Math.ceil(quantity / itemsPerSheet);
-    const wasteRatio = Math.max(0.03, (wastePercent || 5) / 100);
-    wasteSheets = Math.max(2, Math.ceil(sheetsNeeded * wasteRatio)); // Pelo menos 2 folhas de acerto
+    wasteSheets = Math.max(2, Math.ceil(sheetsNeeded * 0.05)); // 5% de quebra (mínimo 2 folhas de acerto)
     totalSheetsToConsume = sheetsNeeded + wasteSheets;
 
     materialCost = totalSheetsToConsume * costPerSheetOrM2;
-
-    // Cliques de impressão: 4x0 (1 clique color), 4x4 (2 cliques color), 1x0 (1 clique PB), 1x1 (2 cliques PB)
     const isColor = printSides === '4x0' || printSides === '4x4';
-    const clickCost = isColor ? clickCostColor : clickCostPB;
+    const clickUnitPrice = isColor ? clickCostColor : clickCostPB;
     const clicksPerSheet = printSides === '4x4' || printSides === '1x1' ? 2 : 1;
-    const totalClicks = totalSheetsToConsume * clicksPerSheet;
-
-    printClickCost = totalClicks * clickCost;
+    clickCost = totalSheetsToConsume * clicksPerSheet * clickUnitPrice;
   }
 
-  // Depreciação de máquina e tempo de operador
-  const effectiveSpeed = Math.max(10, speedPerHour || 120);
-  const hoursNeeded = totalSheetsToConsume / effectiveSpeed;
-  const laborAndDepreciationCost = Math.max(2.5, hoursNeeded * (equipmentHourlyRate || 35.0));
+  const speed = Math.max(20, machineSpeedPerHour || 1500);
+  const hours = totalSheetsToConsume / speed;
+  const machineLaborCost = Math.max(2.5, hours * (machineHourlyRate || 35.0));
 
-  const totalProductionCost =
-    materialCost + printClickCost + finishingsTotalCost + laborAndDepreciationCost;
-  const unitProductionCost = quantity > 0 ? totalProductionCost / quantity : 0;
+  const totalCost = Number((materialCost + clickCost + machineLaborCost).toFixed(2));
+  const unitCost = quantity > 0 ? Number((totalCost / quantity).toFixed(3)) : 0;
 
-  // Multiplicadores de Markup para sugestão de preço de venda
-  const calcPrice = (markup: number) => {
-    const rawTotal = totalProductionCost * (1 + markup / 100);
-    const finalTotal = Math.max(15, Math.ceil(rawTotal)); // Mínimo de R$ 15 para ordens de serviço
-    const unitPrice = quantity > 0 ? Number((finalTotal / quantity).toFixed(3)) : 0;
-    const profit = finalTotal - totalProductionCost;
-    return { markup, price: finalTotal, unitPrice, profit };
+  const buildTier = (markup: number) => {
+    const raw = totalCost * (1 + markup / 100);
+    const price = Math.max(15, Math.ceil(raw));
+    const unitPrice = quantity > 0 ? Number((price / quantity).toFixed(3)) : 0;
+    const profit = Number((price - totalCost).toFixed(2));
+    return { markup, price, unitPrice, profit };
   };
 
-  const recMarkup = Math.max(40, targetMarkupPercent || 120);
-  const minMarkup = Math.max(25, recMarkup * 0.7);
-  const premMarkup = recMarkup * 1.4;
+  const recMarkup = Math.max(40, markupPercent);
+  const minMarkup = Math.max(25, Math.round(recMarkup * 0.7));
+  const premMarkup = Math.round(recMarkup * 1.4);
 
   return {
     itemsPerSheet,
@@ -242,15 +164,14 @@ export function calculateProductionCost(params: {
     wasteSheets,
     totalSheetsToConsume,
     materialCost: Number(materialCost.toFixed(2)),
-    printClickCost: Number(printClickCost.toFixed(2)),
-    finishingsCost: Number(finishingsTotalCost.toFixed(2)),
-    laborAndDepreciationCost: Number(laborAndDepreciationCost.toFixed(2)),
-    totalProductionCost: Number(totalProductionCost.toFixed(2)),
-    unitProductionCost: Number(unitProductionCost.toFixed(3)),
+    clickCost: Number(clickCost.toFixed(2)),
+    machineLaborCost: Number(machineLaborCost.toFixed(2)),
+    totalCost,
+    unitCost,
     suggestedPrices: {
-      minMargin: calcPrice(Math.round(minMarkup)),
-      recommended: calcPrice(Math.round(recMarkup)),
-      premium: calcPrice(Math.round(premMarkup)),
+      min: buildTier(minMarkup),
+      recommended: buildTier(recMarkup),
+      premium: buildTier(premMarkup),
     },
   };
 }
@@ -264,7 +185,7 @@ export function formatBRL(value: number): string {
   }).format(value || 0);
 }
 
-export function formatDateTime(dateStr: string): string {
+export function formatDate(dateStr: string): string {
   if (!dateStr) return '-';
   try {
     const d = new Date(dateStr);
@@ -272,10 +193,63 @@ export function formatDateTime(dateStr: string): string {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
     }).format(d);
   } catch {
     return dateStr;
   }
+}
+
+/**
+ * Gera mensagem formatada pronta para enviar no WhatsApp
+ */
+export function generateWhatsAppMessage(params: {
+  clientName: string;
+  productName: string;
+  quantity: number;
+  widthMm: number;
+  heightMm: number;
+  printSides: string;
+  materialName: string;
+  totalPrice: number;
+  unitPrice: number;
+  notes?: string;
+}): string {
+  const {
+    clientName,
+    productName,
+    quantity,
+    widthMm,
+    heightMm,
+    printSides,
+    materialName,
+    totalPrice,
+    unitPrice,
+    notes,
+  } = params;
+
+  return (
+    `*Orçamento Gráfico - PrintFlow*\n\n` +
+    `Olá, *${clientName || 'Cliente'}*! Segue a cotação solicitada:\n\n` +
+    `📌 *Item:* ${productName}\n` +
+    `🔢 *Quantidade:* ${quantity.toLocaleString('pt-BR')} unidades\n` +
+    `📏 *Formato:* ${widthMm}x${heightMm} mm (${printSides})\n` +
+    `📄 *Papel/Material:* ${materialName}\n` +
+    (notes ? `📝 *Observações:* ${notes}\n` : '') +
+    `\n` +
+    `💰 *Valor Total:* ${formatBRL(totalPrice)}\n` +
+    `🏷️ *Valor Unitário:* ${formatBRL(unitPrice)}/un\n\n` +
+    `⏱️ *Prazo de Produção:* 2 a 3 dias úteis após aprovação da arte.\n` +
+    `✅ *Validade da proposta:* 7 dias.\n\n` +
+    `Para aprovar ou tirar dúvidas, basta responder a esta mensagem!`
+  );
+}
+
+export function generateWhatsAppLink(phone: string, text: string): string {
+  const cleanPhone = phone.replace(/\D/g, '');
+  const encodedText = encodeURIComponent(text);
+  if (cleanPhone) {
+    const fullPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
+    return `https://wa.me/${fullPhone}?text=${encodedText}`;
+  }
+  return `https://wa.me/?text=${encodedText}`;
 }

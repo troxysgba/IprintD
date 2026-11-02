@@ -3,11 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-  CompanySettings,
+  ActivePage,
   Equipment,
-  Invoice,
   Material,
   Order,
   OrderStatus,
@@ -15,49 +14,40 @@ import {
   StockMovement,
 } from './types';
 import { StorageService } from './services/storageService';
-import { Header, ActiveTab } from './components/Header';
-import { DashboardView } from './components/DashboardView';
-import { OrdersView } from './components/OrdersView';
-import { QuotationView } from './components/QuotationView';
-import { InventoryView } from './components/InventoryView';
-import { EquipmentsView } from './components/EquipmentsView';
-import { InvoicesView } from './components/InvoicesView';
+import { Navbar } from './components/Navbar';
+import { GerarPedidoModal } from './components/GerarPedidoModal';
 import { JobTicketModal } from './components/JobTicketModal';
-import { ProposalPrintModal } from './components/ProposalPrintModal';
-import { SettingsModal } from './components/SettingsModal';
-import { CheckCircle2, Info } from 'lucide-react';
+import { OverviewView } from './views/OverviewView';
+import { OrdersView } from './views/OrdersView';
+import { CostCalculatorView } from './views/CostCalculatorView';
+import { InventoryView } from './views/InventoryView';
+import { MachinesView } from './views/MachinesView';
+import { CheckCircle2 } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [activePage, setActivePage] = useState<ActivePage>('visao_geral');
 
   // Application Data States
-  const [settings, setSettings] = useState<CompanySettings>(StorageService.getSettings());
+  const [orders, setOrders] = useState<Order[]>(StorageService.getOrders());
   const [materials, setMaterials] = useState<Material[]>(StorageService.getMaterials());
   const [equipments, setEquipments] = useState<Equipment[]>(StorageService.getEquipments());
-  const [orders, setOrders] = useState<Order[]>(StorageService.getOrders());
-  const [invoices, setInvoices] = useState<Invoice[]>(StorageService.getInvoices());
-  const [movements, setMovements] = useState<StockMovement[]>(
-    StorageService.getStockMovements()
-  );
+  const [movements, setMovements] = useState<StockMovement[]>(StorageService.getStockMovements());
 
   // Modals state
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [jobTicketOrder, setJobTicketOrder] = useState<Order | null>(null);
-  const [proposalPrintOrder, setProposalPrintOrder] = useState<Order | null>(null);
-  const [notification, setNotification] = useState<string | null>(null);
+  const [isGerarPedidoOpen, setIsGerarPedidoOpen] = useState(false);
+  const [selectedJobTicketOrder, setSelectedJobTicketOrder] = useState<Order | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const showNotification = (msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 3500);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   // Sync state helpers
   const refreshData = () => {
-    setSettings(StorageService.getSettings());
+    setOrders(StorageService.getOrders());
     setMaterials(StorageService.getMaterials());
     setEquipments(StorageService.getEquipments());
-    setOrders(StorageService.getOrders());
-    setInvoices(StorageService.getInvoices());
     setMovements(StorageService.getStockMovements());
   };
 
@@ -66,14 +56,13 @@ export default function App() {
     const updated = [newOrder, ...existing.filter((o) => o.id !== newOrder.id)];
     StorageService.saveOrders(updated);
 
-    // If order was created in production state, deduct stock
-    if (newOrder.type === 'pedido' && newOrder.status !== 'orcamento') {
+    if (newOrder.type === 'pedido') {
       StorageService.deductStockForOrder(newOrder);
     }
 
     refreshData();
-    showNotification(
-      `${newOrder.type === 'pedido' ? 'Pedido' : 'Orçamento'} ${newOrder.code} salvo com sucesso!`
+    showToast(
+      `${newOrder.type === 'pedido' ? 'Pedido' : 'Orçamento'} ${newOrder.code} gerado com sucesso!`
     );
   };
 
@@ -91,26 +80,12 @@ export default function App() {
     allOrders[idx] = updatedOrder;
     StorageService.saveOrders(allOrders);
 
-    // If order entered production, deduct stock automatically
-    if (['em_producao', 'acabamento', 'pronto', 'entregue'].includes(nextStatus)) {
+    if (['em_producao', 'pronto', 'entregue'].includes(nextStatus)) {
       StorageService.deductStockForOrder(updatedOrder);
     }
 
-    // If order reached finished state and auto-invoicing is enabled, generate NFS-e automatically!
-    if (
-      (nextStatus === 'pronto' || nextStatus === 'entregue') &&
-      settings.autoIssueInvoiceOnFinish &&
-      !order.hasNfIssued
-    ) {
-      const inv = StorageService.issueInvoiceForOrder(updatedOrder);
-      showNotification(
-        `Pedido ${order.code} concluído! Nota Fiscal NFS-e #${inv.number} gerada automaticamente.`
-      );
-    } else {
-      showNotification(`Pedido ${order.code} atualizado para "${nextStatus.replace('_', ' ')}".`);
-    }
-
     refreshData();
+    showToast(`Pedido ${order.code} atualizado para "${nextStatus.replace('_', ' ')}"!`);
   };
 
   const handleUpdatePayment = (orderId: string, paymentStatus: PaymentStatus) => {
@@ -119,28 +94,17 @@ export default function App() {
     if (idx === -1) return;
 
     allOrders[idx].paymentStatus = paymentStatus;
-    if (paymentStatus === 'pago') {
-      allOrders[idx].amountPaid = allOrders[idx].total;
-    }
     StorageService.saveOrders(allOrders);
     refreshData();
-    showNotification(`Status de pagamento da OS ${allOrders[idx].code} alterado para "${paymentStatus}".`);
+    showToast(`Pagamento da OS ${allOrders[idx].code} alterado para "${paymentStatus}".`);
   };
 
-  const handleIssueInvoice = (order: Order) => {
-    const inv = StorageService.issueInvoiceForOrder(order);
+  const handleAddMaterial = (newMat: Material) => {
+    const all = StorageService.getMaterials();
+    const updated = [...all, newMat];
+    StorageService.saveMaterials(updated);
     refreshData();
-    showNotification(`Nota Fiscal NFS-e #${inv.number} autorizada e vinculada à OS ${order.code}!`);
-  };
-
-  const handleConvertToOrder = (quoteId: string) => {
-    const updated = StorageService.convertQuoteToOrder(quoteId);
-    if (updated) {
-      // Deduct stock for new production order
-      StorageService.deductStockForOrder(updated);
-      refreshData();
-      showNotification(`Orçamento aprovado e convertido na Ordem de Serviço ${updated.code}!`);
-    }
+    showToast(`Insumo "${newMat.name}" cadastrado com sucesso!`);
   };
 
   const handleRecordStockMovement = (
@@ -151,15 +115,7 @@ export default function App() {
   ) => {
     StorageService.recordStockMovement(materialId, type, quantity, notes);
     refreshData();
-    showNotification(`Movimentação de estoque registrada com sucesso!`);
-  };
-
-  const handleAddMaterial = (newMat: Material) => {
-    const all = StorageService.getMaterials();
-    const updated = [...all, newMat];
-    StorageService.saveMaterials(updated);
-    refreshData();
-    showNotification(`Insumo "${newMat.name}" cadastrado com sucesso!`);
+    showToast(`Movimentação de estoque lançada!`);
   };
 
   const handleAddEquipment = (newEq: Equipment) => {
@@ -167,7 +123,7 @@ export default function App() {
     const updated = [...all, newEq];
     StorageService.saveEquipments(updated);
     refreshData();
-    showNotification(`Equipamento "${newEq.name}" cadastrado com sucesso!`);
+    showToast(`Equipamento "${newEq.name}" cadastrado com sucesso!`);
   };
 
   const handleUpdateEquipment = (updatedEq: Equipment) => {
@@ -180,77 +136,64 @@ export default function App() {
     }
   };
 
-  const handleSaveSettings = (newSettings: CompanySettings) => {
-    StorageService.saveSettings(newSettings);
-    refreshData();
-    showNotification(`Configurações da gráfica e fiscais salvas com sucesso!`);
-  };
-
-  const handleResetData = () => {
-    StorageService.resetAll();
-    refreshData();
-    showNotification(`Dados restaurados para o padrão de demonstração.`);
-  };
+  const ordersInProductionCount = orders.filter(
+    (o) => o.type === 'pedido' && ['aprovado', 'em_producao'].includes(o.status)
+  ).length;
 
   const lowStockCount = materials.filter((m) => m.currentStock <= m.minStock).length;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Top Notification Toast */}
-      {notification && (
-        <div className="fixed top-20 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-2.5 animate-in fade-in slide-in-from-top-4 duration-200">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span className="text-xs font-semibold">{notification}</span>
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 antialiased selection:bg-amber-400 selection:text-slate-950">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-20 right-4 sm:right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-2.5 animate-in fade-in slide-in-from-top-4 duration-200 text-xs font-semibold">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Main Top Navigation Bar */}
-      <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onNewOrder={() => setActiveTab('quotation')}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+      {/* Responsive Navbar for Windows and Mobile */}
+      <Navbar
+        activePage={activePage}
+        setActivePage={setActivePage}
+        onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
+        ordersInProductionCount={ordersInProductionCount}
         lowStockCount={lowStockCount}
       />
 
-      {/* Main Viewport Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeTab === 'dashboard' && (
-          <DashboardView
+      {/* Main Page Viewport */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+        {activePage === 'visao_geral' && (
+          <OverviewView
             orders={orders}
             materials={materials}
             equipments={equipments}
-            onNavigateTab={setActiveTab}
-            onOpenNewOrder={() => setActiveTab('quotation')}
+            onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
+            onNavigate={setActivePage}
             onUpdateOrderStatus={handleUpdateOrderStatus}
-            onViewJobTicket={(ord) => setJobTicketOrder(ord)}
+            onSelectOrder={(ord) => setSelectedJobTicketOrder(ord)}
           />
         )}
 
-        {activeTab === 'orders' && (
+        {activePage === 'pedidos' && (
           <OrdersView
             orders={orders}
+            onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
             onUpdateStatus={handleUpdateOrderStatus}
             onUpdatePayment={handleUpdatePayment}
-            onIssueInvoice={handleIssueInvoice}
-            onViewJobTicket={(ord) => setJobTicketOrder(ord)}
-            onPrintProposal={(ord) => setProposalPrintOrder(ord)}
-            onConvertToOrder={handleConvertToOrder}
+            onViewJobTicket={(ord) => setSelectedJobTicketOrder(ord)}
           />
         )}
 
-        {activeTab === 'quotation' && (
-          <QuotationView
+        {activePage === 'calculo_custo' && (
+          <CostCalculatorView
             materials={materials}
             equipments={equipments}
-            onSaveOrder={handleSaveOrder}
-            onPrintProposal={(ord) => setProposalPrintOrder(ord)}
-            defaultMarkup={settings.defaultMarkupPercent}
-            wastePercent={settings.technicalWastePercent}
+            onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
           />
         )}
 
-        {activeTab === 'inventory' && (
+        {activePage === 'estoque' && (
           <InventoryView
             materials={materials}
             movements={movements}
@@ -259,47 +202,31 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'equipments' && (
-          <EquipmentsView
+        {activePage === 'maquinas' && (
+          <MachinesView
             equipments={equipments}
             onAddEquipment={handleAddEquipment}
             onUpdateEquipment={handleUpdateEquipment}
-          />
-        )}
-
-        {activeTab === 'invoices' && (
-          <InvoicesView
-            invoices={invoices}
-            orders={orders}
-            settings={settings}
-            onIssueInvoice={handleIssueInvoice}
+            onOpenGerarPedido={() => setIsGerarPedidoOpen(true)}
           />
         )}
       </main>
 
-      {/* Modals */}
-      {isSettingsOpen && (
-        <SettingsModal
-          settings={settings}
-          onSave={handleSaveSettings}
-          onResetData={handleResetData}
-          onClose={() => setIsSettingsOpen(false)}
+      {/* Central "Gerar Pedido" Modal */}
+      {isGerarPedidoOpen && (
+        <GerarPedidoModal
+          materials={materials}
+          equipments={equipments}
+          onSaveOrder={handleSaveOrder}
+          onClose={() => setIsGerarPedidoOpen(false)}
         />
       )}
 
-      {jobTicketOrder && (
+      {/* Job Ticket (Comanda de Produção) Modal */}
+      {selectedJobTicketOrder && (
         <JobTicketModal
-          order={jobTicketOrder}
-          settings={settings}
-          onClose={() => setJobTicketOrder(null)}
-        />
-      )}
-
-      {proposalPrintOrder && (
-        <ProposalPrintModal
-          order={proposalPrintOrder}
-          settings={settings}
-          onClose={() => setProposalPrintOrder(null)}
+          order={selectedJobTicketOrder}
+          onClose={() => setSelectedJobTicketOrder(null)}
         />
       )}
     </div>
