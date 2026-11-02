@@ -33,42 +33,23 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
   const [equipmentToDelete, setEquipmentToDelete] = useState<Equipment | null>(null);
 
   // Quick simulation state
-  const [simPages, setSimPages] = useState<number>(500);
-  const [simIsColor, setSimIsColor] = useState<boolean>(true);
+  const [simPages, setSimPages] = useState<number>(100);
   const [simMachineId, setSimMachineId] = useState<string>(equipments[0]?.id || '');
+  const selectedSim = equipments.find((e) => e.id === simMachineId) || equipments[0];
 
   // New Equipment Form State
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [category, setCategory] = useState<Equipment['category']>('jato_de_tinta');
-  const [clickPB, setClickPB] = useState<number>(0.015);
-  const [clickColor, setClickColor] = useState<number>(0.045);
-  const [hourlyRate, setHourlyRate] = useState<number>(18.0);
-  const [speed, setSpeed] = useState<number>(600);
+  const [inkPercent, setInkPercent] = useState<number>(3);
+  const [depreciationPercent, setDepreciationPercent] = useState<number>(10);
 
   // Edit Equipment Form State
   const [editName, setEditName] = useState('');
   const [editCode, setEditCode] = useState('');
   const [editCategory, setEditCategory] = useState<Equipment['category']>('jato_de_tinta');
-  const [editClickPB, setEditClickPB] = useState<number>(0.015);
-  const [editClickColor, setEditClickColor] = useState<number>(0.045);
-  const [editHourlyRate, setEditHourlyRate] = useState<number>(18.0);
-  const [editSpeed, setEditSpeed] = useState<number>(600);
-
-  const selectedSim = equipments.find((e) => e.id === simMachineId) || equipments[0];
-
-  const simResult = React.useMemo(() => {
-    if (!selectedSim) return { clickCost: 0, timeCost: 0, total: 0 };
-    const unitClick = simIsColor ? selectedSim.clickCostColor : selectedSim.clickCostPB;
-    const clickCost = simPages * unitClick;
-    const hours = simPages / (selectedSim.speedPerHour || 100);
-    const timeCost = hours * selectedSim.hourlyRate;
-    return {
-      clickCost,
-      timeCost,
-      total: clickCost + timeCost,
-    };
-  }, [selectedSim, simPages, simIsColor]);
+  const [editInkPercent, setEditInkPercent] = useState<number>(3);
+  const [editDepreciationPercent, setEditDepreciationPercent] = useState<number>(10);
 
   const toggleStatus = (eq: Equipment) => {
     const nextStatus = eq.status === 'operacional' ? 'manutencao' : 'operacional';
@@ -84,17 +65,21 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
       code: code.trim() || `EQ-0${equipments.length + 1}`,
       name: name.trim(),
       category,
-      clickCostPB: Number(clickPB) || 0,
-      clickCostColor: Number(clickColor) || 0,
-      hourlyRate: Number(hourlyRate) || 0,
-      speedPerHour: Number(speed) || 0,
+      clickCostPB: 0,
+      clickCostColor: 0,
+      hourlyRate: 0,
+      speedPerHour: 600,
       status: 'operacional',
+      inkPercent: Number(inkPercent) || 0,
+      depreciationPercent: Number(depreciationPercent) || 0,
     };
 
     onAddEquipment(newEq);
     setIsModalOpen(false);
     setName('');
     setCode('');
+    setInkPercent(3);
+    setDepreciationPercent(10);
   };
 
   const handleStartEdit = (eq: Equipment) => {
@@ -102,10 +87,8 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
     setEditName(eq.name);
     setEditCode(eq.code);
     setEditCategory(eq.category);
-    setEditClickPB(eq.clickCostPB);
-    setEditClickColor(eq.clickCostColor);
-    setEditHourlyRate(eq.hourlyRate);
-    setEditSpeed(eq.speedPerHour);
+    setEditInkPercent(eq.inkPercent ?? 3);
+    setEditDepreciationPercent(eq.depreciationPercent ?? 10);
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
@@ -117,10 +100,8 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
       name: editName.trim(),
       code: editCode.trim() || editingEquipment.code,
       category: editCategory,
-      clickCostPB: Number(editClickPB) || 0,
-      clickCostColor: Number(editClickColor) || 0,
-      hourlyRate: Number(editHourlyRate) || 0,
-      speedPerHour: Number(editSpeed) || 0,
+      inkPercent: Number(editInkPercent) || 0,
+      depreciationPercent: Number(editDepreciationPercent) || 0,
     };
 
     onUpdateEquipment(updated);
@@ -177,16 +158,16 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
           <div className="flex items-center gap-2">
             <Calculator className="w-4 h-4 text-amber-400" />
             <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
-              Simulador Direto de Cliques & Tempo de Máquina
+              Simulador de Depreciação (10%) & Tinta (3%)
             </h3>
           </div>
           <p className="text-xs text-slate-400">
-            Calcule o custo instantâneo de rodar uma tiragem específica em qualquer uma de suas impressoras ou equipamentos.
+            Simule instantaneamente o valor adicionado de depreciação de máquina e consumo de tinta para qualquer valor base de pedido.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
             <div>
-              <label className="text-slate-400 block mb-1">Selecione a Máquina</label>
+              <label className="text-slate-400 block mb-1">Máquina Selecionada</label>
               <select
                 value={simMachineId}
                 onChange={(e) => setSimMachineId(e.target.value)}
@@ -201,43 +182,33 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
             </div>
 
             <div>
-              <label className="text-slate-400 block mb-1">Tiragem / Cliques</label>
+              <label className="text-slate-400 block mb-1">Valor Base do Pedido (R$)</label>
               <input
                 type="number"
                 min="1"
+                step="5"
                 value={simPages}
-                onChange={(e) => setSimPages(parseInt(e.target.value) || 1)}
+                onChange={(e) => setSimPages(Math.max(1, parseFloat(e.target.value) || 1))}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono font-bold text-xs text-white"
+                placeholder="100.00"
               />
-            </div>
-
-            <div>
-              <label className="text-slate-400 block mb-1">Tipo de Cor</label>
-              <select
-                value={simIsColor ? 'color' : 'pb'}
-                onChange={(e) => setSimIsColor(e.target.value === 'color')}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
-              >
-                <option value="color">Colorido (CMYK)</option>
-                <option value="pb">Monocromático (PB)</option>
-              </select>
             </div>
           </div>
         </div>
 
         <div className="md:col-span-5 bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 font-mono text-xs">
           <div className="flex justify-between text-slate-400">
-            <span>Cliques diretos:</span>
-            <span className="text-white font-bold">{formatBRL(simResult.clickCost)}</span>
+            <span>Custo com Tinta ({selectedSim?.inkPercent ?? 3}%):</span>
+            <span className="text-sky-400 font-bold">+{formatBRL(simPages * ((selectedSim?.inkPercent ?? 3) / 100))}</span>
           </div>
           <div className="flex justify-between text-slate-400">
-            <span>Hora operacional:</span>
-            <span className="text-white font-bold">{formatBRL(simResult.timeCost)}</span>
+            <span>Depreciação de Máquina ({selectedSim?.depreciationPercent ?? 10}%):</span>
+            <span className="text-indigo-400 font-bold">+{formatBRL(simPages * ((selectedSim?.depreciationPercent ?? 10) / 100))}</span>
           </div>
           <div className="pt-2 border-t border-slate-800 flex justify-between items-baseline font-bold">
-            <span className="text-amber-400 font-sans text-xs">Custo Total da Máquina:</span>
+            <span className="text-amber-400 font-sans text-xs">Total com Acréscimos:</span>
             <span className="text-lg text-white tabular-nums">
-              {formatBRL(simResult.total)}
+              {formatBRL(simPages * (1 + ((selectedSim?.inkPercent ?? 3) + (selectedSim?.depreciationPercent ?? 10)) / 100))}
             </span>
           </div>
         </div>
@@ -295,28 +266,28 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
                 </div>
 
                 <div className="space-y-2 text-xs border-t border-b border-slate-100 py-3">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Custo Tinta/Clique Color:</span>
-                    <span className="font-mono font-bold text-slate-900 tabular-nums">
-                      {formatBRL(eq.clickCostColor)}
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                      Depreciação de Máquina:
+                    </span>
+                    <span className="font-mono font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                      {eq.depreciationPercent ?? 10}% do pedido
                     </span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Custo Tinta/Clique PB:</span>
-                    <span className="font-mono font-bold text-slate-900 tabular-nums">
-                      {formatBRL(eq.clickCostPB)}
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                      Custo com Tinta:
+                    </span>
+                    <span className="font-mono font-black text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                      {eq.inkPercent ?? 3}% do pedido
                     </span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Taxa Operacional/Hora:</span>
-                    <span className="font-mono font-bold text-slate-900 tabular-nums">
-                      {formatBRL(eq.hourlyRate)}/h
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Velocidade de Trabalho:</span>
-                    <span className="font-mono text-slate-800 tabular-nums">
-                      {eq.speedPerHour} un/h
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span>Acréscimo Total:</span>
+                    <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
+                      +{(eq.depreciationPercent ?? 10) + (eq.inkPercent ?? 3)}% sobre o pedido
                     </span>
                   </div>
                 </div>
@@ -408,62 +379,50 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Configuração de Percentuais de Tinta e Depreciação */}
+              <div className="grid grid-cols-2 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200">
                 <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Custo Tinta/Clique Color (R$)
+                  <label className="block font-bold text-slate-800 mb-1 flex items-center justify-between">
+                    <span>Custo Tinta (%)</span>
+                    <span className="text-[10px] text-sky-600 font-mono">Padrão 3%</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    value={clickColor}
-                    onChange={(e) => setClickColor(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="100"
+                      value={inkPercent}
+                      onChange={(e) => setInkPercent(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 pr-7 font-mono font-bold bg-white border border-slate-300 rounded-lg text-xs text-slate-900"
+                      placeholder="3"
+                    />
+                    <span className="absolute right-2.5 top-2 text-xs font-bold text-slate-400">
+                      %
+                    </span>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Custo Tinta/Clique PB (R$)
+                  <label className="block font-bold text-slate-800 mb-1 flex items-center justify-between">
+                    <span>Depreciação (%)</span>
+                    <span className="text-[10px] text-indigo-600 font-mono">Padrão 10%</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    value={clickPB}
-                    onChange={(e) => setClickPB(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Hora Operacional (R$/h)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={hourlyRate}
-                    onChange={(e) => setHourlyRate(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Velocidade (un/h ou m²/h)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={speed}
-                    onChange={(e) => setSpeed(parseInt(e.target.value) || 1)}
-                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="100"
+                      value={depreciationPercent}
+                      onChange={(e) => setDepreciationPercent(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 pr-7 font-mono font-bold bg-white border border-slate-300 rounded-lg text-xs text-slate-900"
+                      placeholder="10"
+                    />
+                    <span className="absolute right-2.5 top-2 text-xs font-bold text-slate-400">
+                      %
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -550,62 +509,48 @@ export const MachinesView: React.FC<MachinesViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Configuração de Percentuais de Tinta e Depreciação no Editar */}
+              <div className="grid grid-cols-2 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200">
                 <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Custo Tinta/Clique Color (R$)
+                  <label className="block font-bold text-slate-800 mb-1 flex items-center justify-between">
+                    <span>Custo Tinta (%)</span>
+                    <span className="text-[10px] text-sky-600 font-mono">% pedido</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    value={editClickColor}
-                    onChange={(e) => setEditClickColor(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="100"
+                      value={editInkPercent}
+                      onChange={(e) => setEditInkPercent(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 pr-7 font-mono font-bold bg-white border border-slate-300 rounded-lg text-xs text-slate-900"
+                    />
+                    <span className="absolute right-2.5 top-2 text-xs font-bold text-slate-400">
+                      %
+                    </span>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Custo Tinta/Clique PB (R$)
+                  <label className="block font-bold text-slate-800 mb-1 flex items-center justify-between">
+                    <span>Depreciação (%)</span>
+                    <span className="text-[10px] text-indigo-600 font-mono">% pedido</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    value={editClickPB}
-                    onChange={(e) => setEditClickPB(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Hora Operacional (R$/h)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={editHourlyRate}
-                    onChange={(e) => setEditHourlyRate(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Velocidade (un/h ou m²/h)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={editSpeed}
-                    onChange={(e) => setEditSpeed(parseInt(e.target.value) || 1)}
-                    className="w-full px-3 py-2 font-mono bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="100"
+                      value={editDepreciationPercent}
+                      onChange={(e) => setEditDepreciationPercent(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 pr-7 font-mono font-bold bg-white border border-slate-300 rounded-lg text-xs text-slate-900"
+                    />
+                    <span className="absolute right-2.5 top-2 text-xs font-bold text-slate-400">
+                      %
+                    </span>
+                  </div>
                 </div>
               </div>
 

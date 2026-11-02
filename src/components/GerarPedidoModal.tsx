@@ -10,6 +10,7 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  Cpu,
   ExternalLink,
   Layers,
   MessageSquare,
@@ -168,6 +169,8 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       clickCostPB: selectedEquipment.clickCostPB,
       machineHourlyRate: selectedEquipment.hourlyRate,
       machineSpeedPerHour: selectedEquipment.speedPerHour,
+      inkPercent: selectedEquipment.inkPercent ?? 3,
+      depreciationPercent: selectedEquipment.depreciationPercent ?? 10,
       markupPercent,
       sheetType,
       rollWidthCm,
@@ -194,15 +197,10 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
     );
   }, [customFinalPrice, costResult]);
 
-  // Custo da tinta calculado em 3% do valor total do pedido (ex: R$ 100 -> R$ 103)
-  const inkCost = useMemo(() => {
-    return Number((basePrice * 0.03).toFixed(2));
-  }, [basePrice]);
-
   // Se for para entregar, acrescenta R$ 7 reais no preço final do produto
   const activeTotalPrice = useMemo(() => {
-    return Number((basePrice + inkCost + (hasDelivery ? 7 : 0)).toFixed(2));
-  }, [basePrice, inkCost, hasDelivery]);
+    return Number((basePrice + (hasDelivery ? 7 : 0)).toFixed(2));
+  }, [basePrice, hasDelivery]);
 
   const activeUnitPrice = useMemo(() => {
     return quantity > 0 ? Number((activeTotalPrice / quantity).toFixed(3)) : 0;
@@ -247,7 +245,6 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       totalPrice: activeTotalPrice,
       unitPrice: activeUnitPrice,
       basePrice,
-      inkCost,
       hasDelivery,
       deliveryFee: 7,
       deliveryAddress,
@@ -264,7 +261,6 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
     activeTotalPrice,
     activeUnitPrice,
     basePrice,
-    inkCost,
     hasDelivery,
     deliveryAddress,
     notes,
@@ -392,7 +388,10 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       materialCost: costResult?.materialCost || 0,
       clickCost: costResult?.clickCost || 0,
       machineLaborCost: costResult?.machineLaborCost || 0,
-      inkCost,
+      inkCost: costResult?.inkCost || 0,
+      inkPercent: costResult?.inkPercent ?? selectedEquipment?.inkPercent ?? 3,
+      depreciationCost: costResult?.depreciationCost || 0,
+      depreciationPercent: costResult?.depreciationPercent ?? selectedEquipment?.depreciationPercent ?? 10,
       totalCost: costResult?.totalCost || 0,
       suggestedPrice: costResult?.suggestedPrices.recommended.price || activeTotalPrice,
       finalPrice: activeTotalPrice,
@@ -859,8 +858,11 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                       ))}
                     </select>
                     {selectedEquipment && (
-                      <div className="text-[11px] text-slate-500 mt-1">
-                        Custo clique color: {formatBRL(selectedEquipment.clickCostColor)} · Velocidade: {selectedEquipment.speedPerHour} un/h
+                      <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap gap-x-2">
+                        <span>Clique color: {formatBRL(selectedEquipment.clickCostColor)}</span>
+                        <span>· Vel: {selectedEquipment.speedPerHour} un/h</span>
+                        <span className="text-sky-700 font-semibold">· Tinta: {selectedEquipment.inkPercent ?? 3}%</span>
+                        <span className="text-indigo-700 font-semibold">· Depr: {selectedEquipment.depreciationPercent ?? 10}%</span>
                       </div>
                     )}
                   </div>
@@ -979,17 +981,6 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                   </div>
                 )}
 
-                {/* Custo com Tinta (3% do pedido) */}
-                <div className="flex items-center justify-between text-xs text-sky-950 bg-sky-50 px-2.5 py-1.5 rounded-lg border border-sky-200">
-                  <span className="flex items-center gap-1.5 font-bold">
-                    <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                    Custo de Tinta (3% do pedido):
-                  </span>
-                  <span className="font-mono font-black text-sky-900">
-                    +{formatBRL(inkCost)}
-                  </span>
-                </div>
-
                 {/* Indicador de Entrega na Composição do Preço */}
                 {hasDelivery && (
                   <div className="flex items-center justify-between text-xs text-amber-900 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200">
@@ -1001,15 +992,15 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                   </div>
                 )}
 
-                {/* Preço de Venda Final Customizável com Cálculo de 3% Tinta */}
+                {/* Preço de Venda Final Customizável */}
                 <div className="pt-2 border-t border-slate-100 space-y-2.5">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <label className="text-xs font-bold text-slate-800 block">
-                        Valor Base do Pedido:
+                        Valor do Pedido:
                       </label>
                       <span className="text-[10px] text-slate-400">
-                        Ex: R$ 100,00 gera +R$ 3,00 de tinta = R$ 103,00
+                        Preço baseado na margem de lucro ou valor personalizado
                       </span>
                     </div>
 
@@ -1037,8 +1028,7 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                         Total Final a Cobrar:
                       </div>
                       <div className="text-[10px] text-slate-300 font-mono">
-                        Base ({formatBRL(basePrice)}) + Tinta 3% ({formatBRL(inkCost)})
-                        {hasDelivery ? ' + Entrega (R$ 7)' : ''}
+                        Base ({formatBRL(basePrice)}){hasDelivery ? ' + Entrega (R$ 7)' : ''}
                       </div>
                     </div>
 

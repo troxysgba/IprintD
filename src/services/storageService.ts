@@ -63,7 +63,11 @@ export const StorageService = {
       save(KEYS.EQUIPMENTS, INITIAL_EQUIPMENTS);
       return INITIAL_EQUIPMENTS;
     }
-    return loaded;
+    return loaded.map((e) => ({
+      ...e,
+      inkPercent: e.inkPercent ?? 3,
+      depreciationPercent: e.depreciationPercent ?? 10,
+    }));
   },
   saveEquipments(equipments: Equipment[]): void {
     save(KEYS.EQUIPMENTS, equipments);

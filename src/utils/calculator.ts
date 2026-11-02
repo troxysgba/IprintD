@@ -238,6 +238,7 @@ export interface PriceTier {
   markup: number;
   basePrice: number;
   inkCost: number;
+  depreciationCost: number;
   price: number;
   unitPrice: number;
   profit: number;
@@ -253,7 +254,10 @@ export interface CostCalculationResult {
   materialCost: number;
   clickCost: number;
   machineLaborCost: number;
-  inkCost: number; // Custo com tinta calculado em 3% do valor do pedido
+  inkCost: number; // Custo com tinta
+  inkPercent?: number; // % custo de tinta
+  depreciationCost: number; // Depreciação de máquina
+  depreciationPercent?: number; // % depreciação da máquina
   totalCost: number;
   unitCost: number;
   isRoll?: boolean;
@@ -281,6 +285,8 @@ export function calculateOrderCost(params: {
   markupPercent?: number;
   sheetType?: SheetType;
   rollWidthCm?: number;
+  inkPercent?: number;
+  depreciationPercent?: number;
 }): CostCalculationResult {
   const {
     quantity,
@@ -296,6 +302,8 @@ export function calculateOrderCost(params: {
     markupPercent = 120,
     sheetType = 'sra3',
     rollWidthCm = 60,
+    inkPercent = 3,
+    depreciationPercent = 10,
   } = params;
 
   let itemsPerSheet = 1;
@@ -329,27 +337,25 @@ export function calculateOrderCost(params: {
     // Custo do substrato (se for cadastrado em m², calcula por m² consumido; se for por folha, usa base linear)
     materialCost = totalRollM2 * costPerSheetOrM2;
 
-    const isColor = printSides === '4x0' || printSides === '4x4';
-    const clickUnitPrice = isColor ? (clickCostColor > 0 ? clickCostColor : 12.0) : clickCostPB;
-    // Em bobina/plotter, o clique/tinta é proporcional à área impressa em m²
-    clickCost = totalRollM2 * clickUnitPrice;
+    // Custo de cliques/impressão zerado no custo base (tinta agora é calculada via % sobre o pedido)
+    clickCost = 0;
 
     const speedM2 = Math.max(4, machineSpeedPerHour || 15);
     const hours = totalRollM2 / speedM2;
     const machineLaborCost = Math.max(3.0, hours * (machineHourlyRate || 35.0));
 
-    const totalCost = Number((materialCost + clickCost + machineLaborCost).toFixed(2));
+    const totalCost = Number((materialCost + machineLaborCost).toFixed(2));
     const unitCost = quantity > 0 ? Number((totalCost / quantity).toFixed(3)) : 0;
 
     const buildTier = (markup: number): PriceTier => {
       const raw = totalCost * (1 + markup / 100);
       const basePrice = Math.max(15, Math.ceil(raw));
-      // Custo com tinta é 3% do valor total do pedido (ex: R$ 100 -> + R$ 3 = R$ 103)
-      const inkCost = Number((basePrice * 0.03).toFixed(2));
-      const price = Number((basePrice + inkCost).toFixed(2));
+      const inkCost = Number((basePrice * (inkPercent / 100)).toFixed(2));
+      const depreciationCost = Number((basePrice * (depreciationPercent / 100)).toFixed(2));
+      const price = Number((basePrice + inkCost + depreciationCost).toFixed(2));
       const unitPrice = quantity > 0 ? Number((price / quantity).toFixed(3)) : 0;
       const profit = Number((price - totalCost).toFixed(2));
-      return { markup, basePrice, inkCost, price, unitPrice, profit };
+      return { markup, basePrice, inkCost, depreciationCost, price, unitPrice, profit };
     };
 
     const recMarkup = Math.max(40, markupPercent);
@@ -371,6 +377,9 @@ export function calculateOrderCost(params: {
       clickCost: Number(clickCost.toFixed(2)),
       machineLaborCost: Number(machineLaborCost.toFixed(2)),
       inkCost: recTier.inkCost,
+      inkPercent,
+      depreciationCost: recTier.depreciationCost,
+      depreciationPercent,
       totalCost,
       unitCost,
       isRoll: true,
@@ -395,7 +404,7 @@ export function calculateOrderCost(params: {
     wasteSheets = Number((billedAreaM2 - totalAreaM2).toFixed(2));
     totalSheetsToConsume = Number(billedAreaM2.toFixed(2));
     materialCost = totalSheetsToConsume * costPerSheetOrM2;
-    clickCost = billedAreaM2 * (clickCostColor > 0 ? clickCostColor : 14.0);
+    clickCost = 0;
   } else {
     // CASO C: FOLHAS CORTADAS (A4, A3, SRA3)
     const nesting = calculateSheetNesting(widthCm, heightCm, {
@@ -409,28 +418,25 @@ export function calculateOrderCost(params: {
     totalSheetsToConsume = sheetsNeeded + wasteSheets;
 
     materialCost = totalSheetsToConsume * costPerSheetOrM2;
-    const isColor = printSides === '4x0' || printSides === '4x4';
-    const clickUnitPrice = isColor ? clickCostColor : clickCostPB;
-    const clicksPerSheet = printSides === '4x4' || printSides === '1x1' ? 2 : 1;
-    clickCost = totalSheetsToConsume * clicksPerSheet * clickUnitPrice;
+    clickCost = 0;
   }
 
   const speed = Math.max(20, machineSpeedPerHour || 1500);
   const hours = totalSheetsToConsume / speed;
   const machineLaborCost = Math.max(2.5, hours * (machineHourlyRate || 35.0));
 
-  const totalCost = Number((materialCost + clickCost + machineLaborCost).toFixed(2));
+  const totalCost = Number((materialCost + machineLaborCost).toFixed(2));
   const unitCost = quantity > 0 ? Number((totalCost / quantity).toFixed(3)) : 0;
 
   const buildTier = (markup: number): PriceTier => {
     const raw = totalCost * (1 + markup / 100);
     const basePrice = Math.max(15, Math.ceil(raw));
-    // Custo com tinta é 3% do valor total do pedido (ex: R$ 100 -> + R$ 3 = R$ 103)
-    const inkCost = Number((basePrice * 0.03).toFixed(2));
-    const price = Number((basePrice + inkCost).toFixed(2));
+    const inkCost = Number((basePrice * (inkPercent / 100)).toFixed(2));
+    const depreciationCost = Number((basePrice * (depreciationPercent / 100)).toFixed(2));
+    const price = Number((basePrice + inkCost + depreciationCost).toFixed(2));
     const unitPrice = quantity > 0 ? Number((price / quantity).toFixed(3)) : 0;
     const profit = Number((price - totalCost).toFixed(2));
-    return { markup, basePrice, inkCost, price, unitPrice, profit };
+    return { markup, basePrice, inkCost, depreciationCost, price, unitPrice, profit };
   };
 
   const recMarkup = Math.max(40, markupPercent);
@@ -452,6 +458,9 @@ export function calculateOrderCost(params: {
     clickCost: Number(clickCost.toFixed(2)),
     machineLaborCost: Number(machineLaborCost.toFixed(2)),
     inkCost: recTier.inkCost,
+    inkPercent,
+    depreciationCost: recTier.depreciationCost,
+    depreciationPercent,
     totalCost,
     unitCost,
     isRoll: false,
@@ -501,6 +510,7 @@ export function generateWhatsAppMessage(params: {
   unitPrice: number;
   basePrice?: number;
   inkCost?: number;
+  depreciationCost?: number;
   hasDelivery?: boolean;
   deliveryFee?: number;
   deliveryAddress?: string;
@@ -518,18 +528,12 @@ export function generateWhatsAppMessage(params: {
     unitPrice,
     basePrice,
     inkCost,
+    depreciationCost,
     hasDelivery,
     deliveryFee = 7,
     deliveryAddress,
     notes,
   } = params;
-
-  const resolvedInkCost =
-    inkCost !== undefined
-      ? inkCost
-      : basePrice !== undefined
-        ? Number((basePrice * 0.03).toFixed(2))
-        : 0;
 
   return (
     `*Orçamento Gráfico - PrintFlow*\n\n` +
@@ -538,9 +542,6 @@ export function generateWhatsAppMessage(params: {
     `🔢 *Quantidade:* ${quantity.toLocaleString('pt-BR')} unidades\n` +
     `📏 *Tamanho / Formato:* ${widthCm} x ${heightCm} cm (${printSides})\n` +
     `📄 *Papel / Material:* ${materialName}\n` +
-    (resolvedInkCost > 0
-      ? `💧 *Custo com Tinta (3%):* ${formatBRL(resolvedInkCost)}\n`
-      : '') +
     (hasDelivery
       ? `🚚 *Entrega:* Sim (+ ${formatBRL(deliveryFee)})${deliveryAddress ? `\n📍 *Endereço:* ${deliveryAddress}` : ''}\n`
       : `🏪 *Retirada:* No balcão da gráfica\n`) +

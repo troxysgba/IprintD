@@ -86,6 +86,8 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
       clickCostPB: selectedEquipment.clickCostPB,
       machineHourlyRate: selectedEquipment.hourlyRate,
       machineSpeedPerHour: selectedEquipment.speedPerHour,
+      inkPercent: selectedEquipment.inkPercent ?? 3,
+      depreciationPercent: selectedEquipment.depreciationPercent ?? 10,
       markupPercent,
       sheetType,
       rollWidthCm,
@@ -180,6 +182,9 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
       clickCost: costResult.clickCost,
       machineLaborCost: costResult.machineLaborCost,
       inkCost: costResult.inkCost,
+      inkPercent: costResult.inkPercent,
+      depreciationCost: costResult.depreciationCost,
+      depreciationPercent: costResult.depreciationPercent,
       totalCost: costResult.totalCost,
       suggestedPrice: costResult.suggestedPrices.recommended.price,
       finalPrice: costResult.suggestedPrices.recommended.price,
@@ -201,7 +206,6 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
       `📄 Formato de Aproveitamento: ${mediaText}\n` +
       `📑 Substrato: ${selectedMaterial?.name || '-'}\n` +
       `🖨️ Equipamento: ${selectedEquipment?.name || '-'}\n` +
-      `💧 Custo de Tinta (3%): ${formatBRL(costResult.inkCost)}\n` +
       `💰 Preço Recomendado: ${formatBRL(costResult.suggestedPrices.recommended.price)} (${formatBRL(costResult.suggestedPrices.recommended.unitPrice)}/un)\n` +
       `📊 Custo de Produção (CPV): ${formatBRL(costResult.totalCost)}`;
 
@@ -725,32 +729,9 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
                 </div>
 
                 <div className="flex justify-between text-slate-600">
-                  <span>
-                    {sheetType === 'bobina'
-                      ? 'Tinta Plotter / Impressão Digital (m²)'
-                      : 'Cliques de Impressão / Toner'}
-                  </span>
-                  <span className="font-mono font-bold text-slate-900 tabular-nums">
-                    {formatBRL(costResult.clickCost)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between text-slate-600">
                   <span>Mão de Obra e Depreciação de Máquina</span>
                   <span className="font-mono font-bold text-slate-900 tabular-nums">
                     {formatBRL(costResult.machineLaborCost)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center text-slate-700 bg-sky-50/80 p-2.5 rounded-lg border border-sky-100">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-slate-800">Custo com Tinta (3% do pedido)</span>
-                    <span className="text-[10px] bg-sky-100 text-sky-800 font-bold px-1.5 py-0.5 rounded border border-sky-200">
-                      3%
-                    </span>
-                  </div>
-                  <span className="font-mono font-bold text-sky-700 tabular-nums">
-                    +{formatBRL(costResult.inkCost)}
                   </span>
                 </div>
 
@@ -800,7 +781,7 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
                       {formatBRL(costResult.suggestedPrices.min.price)}
                     </div>
                     <div className="text-[10px] text-slate-400 font-mono">
-                      +{costResult.suggestedPrices.min.markup}% (+3% tinta)
+                      +{costResult.suggestedPrices.min.markup}% margem
                     </div>
                   </div>
 
@@ -812,7 +793,7 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
                       {formatBRL(costResult.suggestedPrices.recommended.price)}
                     </div>
                     <div className="text-[10px] text-slate-400 font-mono">
-                      +{costResult.suggestedPrices.recommended.markup}% (+3% tinta)
+                      +{costResult.suggestedPrices.recommended.markup}% margem
                     </div>
                   </div>
 
@@ -824,7 +805,7 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
                       {formatBRL(costResult.suggestedPrices.premium.price)}
                     </div>
                     <div className="text-[10px] text-slate-400 font-mono">
-                      +{costResult.suggestedPrices.premium.markup}% (+3% tinta)
+                      +{costResult.suggestedPrices.premium.markup}% margem
                     </div>
                   </div>
                 </div>
@@ -835,7 +816,9 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
             {costResult && (
               <div className="bg-slate-900 text-white p-4 rounded-xl space-y-2">
                 <div className="flex justify-between items-center text-xs text-slate-300">
-                  <span className="font-semibold uppercase tracking-wider">Preço Sugerido (com 3% de tinta):</span>
+                  <span className="font-semibold uppercase tracking-wider">
+                    Preço Sugerido (tinta {costResult.inkPercent}% · depr. {costResult.depreciationPercent}%):
+                  </span>
                   <span className="font-mono text-emerald-400 text-xs">
                     Lucro Bruto: {formatBRL(costResult.suggestedPrices.recommended.profit)}
                   </span>
@@ -850,9 +833,11 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
                   </div>
                 </div>
 
-                <div className="text-[11px] text-slate-300 pt-1.5 border-t border-slate-800 flex items-center justify-between">
-                  <span>Base: {formatBRL(costResult.suggestedPrices.recommended.basePrice)}</span>
-                  <span className="text-sky-300 font-mono font-semibold">+ Tinta (3%): {formatBRL(costResult.inkCost)}</span>
+                <div className="text-[11px] text-slate-300 pt-1.5 border-t border-slate-800 flex flex-wrap items-center justify-between gap-1">
+                  <span>Custo Produção: {formatBRL(costResult.totalCost)}</span>
+                  <span>Tinta ({costResult.inkPercent}%): {formatBRL(costResult.suggestedPrices.recommended.inkCost)}</span>
+                  <span>Depr. ({costResult.depreciationPercent}%): {formatBRL(costResult.suggestedPrices.recommended.depreciationCost)}</span>
+                  <span className="text-emerald-300 font-mono font-semibold">Lucro: {formatBRL(costResult.suggestedPrices.recommended.profit)}</span>
                 </div>
               </div>
             )}

@@ -47,7 +47,10 @@ export interface Order {
   materialCost: number;
   clickCost: number;
   machineLaborCost: number;
-  inkCost?: number; // Custo com tinta calculado em 3% do valor do pedido
+  inkCost?: number; // Custo com tinta
+  inkPercent?: number; // % custo de tinta (padrão 3%)
+  depreciationCost?: number; // Depreciação de máquina
+  depreciationPercent?: number; // % depreciação da máquina (padrão 10%)
   totalCost: number;
   suggestedPrice: number;
   finalPrice: number;
@@ -86,6 +89,8 @@ export interface Equipment {
   hourlyRate: number;
   speedPerHour: number; // un/h ou m²/h
   status: 'operacional' | 'manutencao';
+  inkPercent?: number; // % de custo com tinta sobre o pedido (ex: 3)
+  depreciationPercent?: number; // % de depreciação da máquina sobre o pedido (ex: 10)
 }
 
 export interface StockMovement {

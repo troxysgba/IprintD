@@ -182,9 +182,11 @@ export const JobTicketModal: React.FC<JobTicketModalProps> = ({ order, onClose }
                 <span className="font-bold text-slate-900">
                   Total: {formatBRL(order.finalPrice)}
                 </span>
-                <span className="text-sky-700 ml-2 font-semibold">
-                  · Tinta (3%): {formatBRL(order.inkCost ?? Number(((order.finalPrice - (order.hasDelivery ? 7 : 0)) * 0.03 / 1.03).toFixed(2)))}
-                </span>
+                {order.inkPercent !== undefined && order.depreciationPercent !== undefined && (
+                  <span className="text-slate-500 ml-2 text-[10px]">
+                    (Tinta: {order.inkPercent}% · Depr: {order.depreciationPercent}%)
+                  </span>
+                )}
                 {order.hasDelivery && (
                   <span className="text-amber-800 ml-2 font-semibold">
                     · Entrega (+R$ 7,00)
