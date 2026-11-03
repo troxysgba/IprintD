@@ -138,6 +138,84 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
   const isPlotter = selectedEquipment?.category === 'plotter' || selectedMaterial?.unit === 'm2';
 
+  // Helper to extract concise, clean material name for product description
+  const getCleanMaterialName = (mat: Material): string => {
+    let clean = mat.name.replace(/\s*\([^)]*\)/g, '').trim();
+    clean = clean.replace(/\s+(SRA3|A3|A4)\b/gi, '').trim();
+    return clean;
+  };
+
+  // Helper to intelligently update "Descrição do Item" when a material is chosen
+  const buildUpdatedProductName = (
+    currentName: string,
+    newMat: Material,
+    currentMatId: string
+  ): string => {
+    const newCleanMat = getCleanMaterialName(newMat);
+
+    if (!currentName || !currentName.trim() || currentName.trim() === 'Serviço Gráfico') {
+      return `${widthCm}x${heightCm} cm - ${newCleanMat}`;
+    }
+
+    const trimmed = currentName.trim();
+
+    // If it already has a " - " separator
+    if (trimmed.includes(' - ')) {
+      const parts = trimmed.split(' - ');
+      const base = parts[0].trim();
+      return `${base} - ${newCleanMat}`;
+    }
+
+    // Check if currentName contains the previous material or standard graphic substrate keywords
+    const oldMat = materials.find((m) => m.id === currentMatId);
+    const oldCleanMat = oldMat ? getCleanMaterialName(oldMat) : '';
+
+    const candidates = [
+      oldCleanMat,
+      oldMat?.name,
+      'Couché 300g Fosco',
+      'Couché 300g',
+      'Couché 150g Brilho',
+      'Couché 150g',
+      'Couché 250g',
+      'Offset 90g Sulfite',
+      'Offset 90g',
+      'Offset 75g',
+      'Sulfite 75g',
+      'Sulfite 90g',
+      'Vinil Adesivo Branco Brilho',
+      'Vinil Adesivo',
+      'Adesivo Vinil',
+      'Lona Frontlight 440g Fosca Banner',
+      'Lona Frontlight 440g',
+      'Lona 440g',
+      'Bobina Térmica BOPP Fosco',
+      'BOPP Fosco',
+    ].filter(Boolean) as string[];
+
+    for (const cand of candidates) {
+      const idx = trimmed.toLowerCase().indexOf(cand.toLowerCase());
+      if (idx !== -1) {
+        const base = trimmed.substring(0, idx).trim();
+        if (base) {
+          return `${base} - ${newCleanMat}`;
+        } else {
+          return newCleanMat;
+        }
+      }
+    }
+
+    return `${trimmed} - ${newCleanMat}`;
+  };
+
+  const handleMaterialChange = (newMatId: string) => {
+    setSelectedMaterialId(newMatId);
+    const newMat = materials.find((m) => m.id === newMatId);
+    if (newMat) {
+      setProductName((prev) => buildUpdatedProductName(prev, newMat, selectedMaterialId));
+    }
+  };
+
   // Sincroniza com dados enviados pelo cálculo de custo
   React.useEffect(() => {
     if (initialOrderData) {
@@ -656,14 +734,30 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Descrição do Item
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-medium text-slate-700">
+                      Descrição do Item *
+                    </label>
+                    {selectedMaterial && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cleanMat = getCleanMaterialName(selectedMaterial);
+                          setProductName(`${widthCm}x${heightCm} cm - ${cleanMat}`);
+                        }}
+                        className="text-[10px] text-amber-700 hover:text-amber-900 font-semibold hover:underline cursor-pointer flex items-center gap-1"
+                        title="Redefinir nome com dimensões e material atual"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Sincronizar</span>
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                   />
                 </div>
 
@@ -825,13 +919,18 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Papel / Substrato
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-slate-700">
+                        Papel / Substrato
+                      </label>
+                      <span className="text-[10px] text-amber-700 font-medium">
+                        Atualiza descrição
+                      </span>
+                    </div>
                     <select
                       value={selectedMaterialId}
-                      onChange={(e) => setSelectedMaterialId(e.target.value)}
-                      className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                      onChange={(e) => handleMaterialChange(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                     >
                       {materials.map((m) => (
                         <option key={m.id} value={m.id}>

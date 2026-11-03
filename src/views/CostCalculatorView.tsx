@@ -183,8 +183,10 @@ export const CostCalculatorView: React.FC<CostCalculatorViewProps> = ({
         ? `Bobina ${rollWidthCm}cm`
         : sheetType.toUpperCase();
 
+    const cleanMat = selectedMaterial.name.replace(/\s*\([^)]*\)/g, '').replace(/\s+(SRA3|A3|A4)\b/gi, '').trim();
+
     onOpenGerarPedido({
-      productName: `Item ${widthCm}x${heightCm} cm (${formatName})`,
+      productName: `Item ${widthCm}x${heightCm} cm - ${cleanMat}`,
       quantity: Number(quantity),
       widthCm: Number(widthCm),
       heightCm: Number(heightCm),
