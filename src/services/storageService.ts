@@ -27,7 +27,8 @@ const KEYS = {
 
 function load<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(key);
+    if (typeof window === 'undefined' || !window.localStorage) return fallback;
+    const raw = window.localStorage.getItem(key);
     if (!raw) return fallback;
     return JSON.parse(raw);
   } catch (e) {
@@ -38,10 +39,30 @@ function load<T>(key: string, fallback: T): T {
 
 function save<T>(key: string, data: T): void {
   try {
-    localStorage.setItem(key, JSON.stringify(data));
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    window.localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
     console.warn(`Error saving key ${key}:`, e);
   }
+}
+
+/**
+ * Recursively removes any undefined values from an object before saving to Firestore,
+ * ensuring Firestore never rejects documents with 'Unsupported field value: undefined'.
+ */
+export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): T {
+  const result: any = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (val !== undefined) {
+      if (val !== null && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Date)) {
+        result[key] = sanitizeForFirestore(val);
+      } else {
+        result[key] = val;
+      }
+    }
+  }
+  return result as T;
 }
 
 export const StorageService = {
@@ -129,16 +150,26 @@ export const StorageService = {
 
   async saveOrder(order: Order): Promise<void> {
     const path = 'orders';
+    const cleanOrder = sanitizeForFirestore(order);
+
+    // 1. Immediately persist to localStorage so changes never disappear on page refresh
     try {
-      await setDoc(doc(db, path, order.id), order);
       const current = this.getOrders();
-      const exists = current.some((o) => o.id === order.id);
+      const exists = current.some((o) => o.id === cleanOrder.id);
       const updated = exists
-        ? current.map((o) => (o.id === order.id ? order : o))
-        : [order, ...current];
+        ? current.map((o) => (o.id === cleanOrder.id ? cleanOrder : o))
+        : [cleanOrder, ...current];
       save(KEYS.ORDERS, updated);
+    } catch (err) {
+      console.warn('[LocalStorage saveOrder error]:', err);
+    }
+
+    // 2. Persist to Firestore cloud database
+    try {
+      await setDoc(doc(db, path, cleanOrder.id), cleanOrder);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `${path}/${order.id}`);
+      console.error('[Firestore saveOrder error]:', error);
+      handleFirestoreError(error, OperationType.WRITE, `${path}/${cleanOrder.id}`);
     }
   },
 
@@ -151,11 +182,19 @@ export const StorageService = {
 
   async deleteOrder(orderId: string): Promise<void> {
     const path = 'orders';
+    // 1. Immediately persist deletion locally so it never reappears on refresh
     try {
-      await deleteDoc(doc(db, path, orderId));
       const filtered = this.getOrders().filter((o) => o.id !== orderId);
       save(KEYS.ORDERS, filtered);
+    } catch (err) {
+      console.warn('[LocalStorage deleteOrder error]:', err);
+    }
+
+    // 2. Persist deletion in Firestore
+    try {
+      await deleteDoc(doc(db, path, orderId));
     } catch (error) {
+      console.error('[Firestore deleteOrder error]:', error);
       handleFirestoreError(error, OperationType.DELETE, `${path}/${orderId}`);
     }
   },
@@ -170,7 +209,8 @@ export const StorageService = {
           localStorage.setItem(KEYS.SEEDED + '_materials', 'true');
           for (const m of INITIAL_MATERIALS) {
             try {
-              await setDoc(doc(db, path, m.id), m);
+              const cleanM = sanitizeForFirestore(m);
+              await setDoc(doc(db, path, cleanM.id), cleanM);
             } catch (err) {
               console.warn('Seeding material failed:', err);
             }
@@ -194,16 +234,24 @@ export const StorageService = {
 
   async saveMaterial(material: Material): Promise<void> {
     const path = 'materials';
+    const clean = sanitizeForFirestore(material);
+
     try {
-      await setDoc(doc(db, path, material.id), material);
       const current = this.getMaterials();
-      const exists = current.some((m) => m.id === material.id);
+      const exists = current.some((m) => m.id === clean.id);
       const updated = exists
-        ? current.map((m) => (m.id === material.id ? material : m))
-        : [...current, material];
+        ? current.map((m) => (m.id === clean.id ? clean : m))
+        : [...current, clean];
       save(KEYS.MATERIALS, updated);
+    } catch (err) {
+      console.warn('[LocalStorage saveMaterial error]:', err);
+    }
+
+    try {
+      await setDoc(doc(db, path, clean.id), clean);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `${path}/${material.id}`);
+      console.error('[Firestore saveMaterial error]:', error);
+      handleFirestoreError(error, OperationType.WRITE, `${path}/${clean.id}`);
     }
   },
 
@@ -217,10 +265,16 @@ export const StorageService = {
   async deleteMaterial(materialId: string): Promise<void> {
     const path = 'materials';
     try {
-      await deleteDoc(doc(db, path, materialId));
       const filtered = this.getMaterials().filter((m) => m.id !== materialId);
       save(KEYS.MATERIALS, filtered);
+    } catch (err) {
+      console.warn('[LocalStorage deleteMaterial error]:', err);
+    }
+
+    try {
+      await deleteDoc(doc(db, path, materialId));
     } catch (error) {
+      console.error('[Firestore deleteMaterial error]:', error);
       handleFirestoreError(error, OperationType.DELETE, `${path}/${materialId}`);
     }
   },
@@ -235,7 +289,8 @@ export const StorageService = {
           localStorage.setItem(KEYS.SEEDED + '_equipments', 'true');
           for (const eq of INITIAL_EQUIPMENTS) {
             try {
-              await setDoc(doc(db, path, eq.id), eq);
+              const cleanEq = sanitizeForFirestore(eq);
+              await setDoc(doc(db, path, cleanEq.id), cleanEq);
             } catch (err) {
               console.warn('Seeding equipment failed:', err);
             }
@@ -259,16 +314,24 @@ export const StorageService = {
 
   async saveEquipment(equipment: Equipment): Promise<void> {
     const path = 'equipments';
+    const clean = sanitizeForFirestore(equipment);
+
     try {
-      await setDoc(doc(db, path, equipment.id), equipment);
       const current = this.getEquipments();
-      const exists = current.some((e) => e.id === equipment.id);
+      const exists = current.some((e) => e.id === clean.id);
       const updated = exists
-        ? current.map((e) => (e.id === equipment.id ? equipment : e))
-        : [...current, equipment];
+        ? current.map((e) => (e.id === clean.id ? clean : e))
+        : [...current, clean];
       save(KEYS.EQUIPMENTS, updated);
+    } catch (err) {
+      console.warn('[LocalStorage saveEquipment error]:', err);
+    }
+
+    try {
+      await setDoc(doc(db, path, clean.id), clean);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `${path}/${equipment.id}`);
+      console.error('[Firestore saveEquipment error]:', error);
+      handleFirestoreError(error, OperationType.WRITE, `${path}/${clean.id}`);
     }
   },
 
@@ -282,10 +345,16 @@ export const StorageService = {
   async deleteEquipment(equipmentId: string): Promise<void> {
     const path = 'equipments';
     try {
-      await deleteDoc(doc(db, path, equipmentId));
       const filtered = this.getEquipments().filter((e) => e.id !== equipmentId);
       save(KEYS.EQUIPMENTS, filtered);
+    } catch (err) {
+      console.warn('[LocalStorage deleteEquipment error]:', err);
+    }
+
+    try {
+      await deleteDoc(doc(db, path, equipmentId));
     } catch (error) {
+      console.error('[Firestore deleteEquipment error]:', error);
       handleFirestoreError(error, OperationType.DELETE, `${path}/${equipmentId}`);
     }
   },
@@ -300,7 +369,8 @@ export const StorageService = {
           localStorage.setItem(KEYS.SEEDED + '_presets', 'true');
           for (const p of INITIAL_PRESETS) {
             try {
-              await setDoc(doc(db, path, p.id), p);
+              const cleanP = sanitizeForFirestore(p);
+              await setDoc(doc(db, path, cleanP.id), cleanP);
             } catch (err) {
               console.warn('Seeding preset failed:', err);
             }
@@ -324,16 +394,24 @@ export const StorageService = {
 
   async savePreset(preset: QuickProductPreset): Promise<void> {
     const path = 'presets';
+    const clean = sanitizeForFirestore(preset);
+
     try {
-      await setDoc(doc(db, path, preset.id), preset);
       const current = this.getPresets();
-      const exists = current.some((p) => p.id === preset.id);
+      const exists = current.some((p) => p.id === clean.id);
       const updated = exists
-        ? current.map((p) => (p.id === preset.id ? preset : p))
-        : [...current, preset];
+        ? current.map((p) => (p.id === clean.id ? clean : p))
+        : [...current, clean];
       save(KEYS.PRESETS, updated);
+    } catch (err) {
+      console.warn('[LocalStorage savePreset error]:', err);
+    }
+
+    try {
+      await setDoc(doc(db, path, clean.id), clean);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `${path}/${preset.id}`);
+      console.error('[Firestore savePreset error]:', error);
+      handleFirestoreError(error, OperationType.WRITE, `${path}/${clean.id}`);
     }
   },
 
@@ -347,10 +425,16 @@ export const StorageService = {
   async deletePreset(presetId: string): Promise<void> {
     const path = 'presets';
     try {
-      await deleteDoc(doc(db, path, presetId));
       const filtered = this.getPresets().filter((p) => p.id !== presetId);
       save(KEYS.PRESETS, filtered);
+    } catch (err) {
+      console.warn('[LocalStorage deletePreset error]:', err);
+    }
+
+    try {
+      await deleteDoc(doc(db, path, presetId));
     } catch (error) {
+      console.error('[Firestore deletePreset error]:', error);
       handleFirestoreError(error, OperationType.DELETE, `${path}/${presetId}`);
     }
   },
@@ -365,7 +449,8 @@ export const StorageService = {
           localStorage.setItem(KEYS.SEEDED + '_movements', 'true');
           for (const m of INITIAL_STOCK_MOVEMENTS) {
             try {
-              await setDoc(doc(db, path, m.id), m);
+              const cleanM = sanitizeForFirestore(m);
+              await setDoc(doc(db, path, cleanM.id), cleanM);
             } catch (err) {
               console.warn('Seeding movement failed:', err);
             }
@@ -414,7 +499,7 @@ export const StorageService = {
     material.currentStock = Number(next.toFixed(2));
     await this.saveMaterial(material);
 
-    const newMovement: StockMovement = {
+    const newMovement: StockMovement = sanitizeForFirestore({
       id: `mov_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       materialId: material.id,
       materialName: material.name,
@@ -423,13 +508,21 @@ export const StorageService = {
       quantity,
       previousStock: prev,
       newStock: material.currentStock,
-      orderCode,
-      notes,
-    };
+      orderCode: orderCode || '',
+      notes: notes || '',
+    });
+
+    try {
+      const movements = this.getStockMovements();
+      save(KEYS.MOVEMENTS, [newMovement, ...movements]);
+    } catch (err) {
+      console.warn('[LocalStorage recordStockMovement error]:', err);
+    }
 
     try {
       await setDoc(doc(db, 'stockMovements', newMovement.id), newMovement);
     } catch (error) {
+      console.error('[Firestore recordStockMovement error]:', error);
       handleFirestoreError(error, OperationType.WRITE, `stockMovements/${newMovement.id}`);
     }
   },
@@ -448,13 +541,10 @@ export const StorageService = {
         `Consumo OS ${order.code} (${order.productName})`,
         order.code
       );
+      // Mark as deducted and save order state
+      const updatedOrder: Order = { ...order, stockDeducted: true };
+      await this.saveOrder(updatedOrder);
     }
-
-    const updatedOrder: Order = {
-      ...order,
-      stockDeducted: true,
-    };
-    await this.saveOrder(updatedOrder);
   },
 
   resetAll(): void {
