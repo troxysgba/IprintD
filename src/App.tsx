@@ -56,10 +56,21 @@ export default function App() {
   useEffect(() => {
     StorageService.initConnection();
 
-    const unsubOrders = StorageService.subscribeOrders((liveOrders) => {
-      setOrders(liveOrders);
-      setIsCloudConnected(true);
-    });
+    const unsubOrders = StorageService.subscribeOrders(
+      (liveOrders) => {
+        setOrders(liveOrders);
+        setIsCloudConnected(true);
+      },
+      (change) => {
+        if (change.type === 'added') {
+          showToast(`🔔 [Tempo Real] Pedido ${change.order.code} (${change.order.clientName}) recebido da equipe!`);
+        } else if (change.type === 'modified') {
+          showToast(`🔄 [Tempo Real] Pedido ${change.order.code} atualizado na nuvem!`);
+        } else if (change.type === 'removed') {
+          showToast(`🗑️ [Tempo Real] Pedido ${change.order.code} removido da nuvem.`);
+        }
+      }
+    );
 
     const unsubMaterials = StorageService.subscribeMaterials((liveMaterials) => {
       setMaterials(liveMaterials);
@@ -113,13 +124,14 @@ export default function App() {
 
     showToast(
       `${newOrder.type === 'pedido' ? 'Pedido' : 'Orçamento'} ${newOrder.code} ${
-        isEdit ? 'atualizado e sincronizado' : 'gerado com sucesso e lançado na página Pedidos'
+        isEdit ? 'atualizado e sincronizado na nuvem' : 'gerado com sucesso e sincronizado em tempo real'
       }!`
     );
   };
 
   const handleDeleteOrder = async (orderId: string) => {
     const orderToDelete = orders.find((o) => o.id === orderId);
+    setOrders((prev) => prev.filter((o) => o.id !== orderId));
     await StorageService.deleteOrder(orderId);
     showToast(`Pedido ${orderToDelete?.code || ''} excluído da nuvem.`);
   };
@@ -137,6 +149,7 @@ export default function App() {
       status: nextStatus,
     };
 
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? updatedOrder : o)));
     await StorageService.saveOrder(updatedOrder);
 
     if (['em_producao', 'pronto', 'entregue'].includes(nextStatus)) {
@@ -154,6 +167,7 @@ export default function App() {
       ...order,
       paymentStatus,
     };
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? updatedOrder : o)));
     await StorageService.saveOrder(updatedOrder);
     showToast(`Pagamento da OS ${order.code} alterado para "${paymentStatus}".`);
   };

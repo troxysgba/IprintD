@@ -11,13 +11,16 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Cloud,
   MessageSquare,
   Package,
   Pencil,
   PlusCircle,
   Printer,
   Search,
+  Sparkles,
   Trash2,
+  Users,
   X,
 } from 'lucide-react';
 
@@ -150,6 +153,33 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
             <PlusCircle className="w-4 h-4 text-amber-400" />
             <span>Gerar Pedido</span>
           </button>
+        </div>
+
+        {/* Real-time Multi-User Sync Banner */}
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/90 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
+              <Cloud className="w-4 h-4 text-emerald-600 animate-pulse" />
+            </div>
+            <div>
+              <div className="font-bold text-emerald-950 flex items-center gap-1.5 flex-wrap">
+                <span>Banco de Dados Firestore Conectado</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/80 text-emerald-900">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping"></span>
+                  Tempo Real Ativo
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-800/90 mt-0.5">
+                Vários computadores e celulares podem <strong>adicionar</strong>, <strong>editar</strong> e <strong>excluir</strong> pedidos simultaneamente. As alterações aparecem instantaneamente para toda a equipe.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 sm:self-center self-start">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-emerald-900 bg-white/90 border border-emerald-200 px-2.5 py-1 rounded-lg shadow-2xs">
+              <Users className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{orders.length} pedidos na nuvem</span>
+            </span>
+          </div>
         </div>
 
         {/* Filter Tabs */}

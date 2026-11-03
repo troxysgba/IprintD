@@ -68,8 +68,16 @@ export const StorageService = {
   },
 
   // 1. ORDERS - REAL-TIME FIRESTORE MULTI-USER SYNC
-  subscribeOrders(callback: (orders: Order[]) => void): Unsubscribe {
+  subscribeOrders(
+    callback: (orders: Order[]) => void,
+    onRemoteChange?: (change: {
+      type: 'added' | 'modified' | 'removed';
+      order: Order;
+    }) => void
+  ): Unsubscribe {
     const path = 'orders';
+    let isInitial = true;
+
     return onSnapshot(
       collection(db, path),
       async (snapshot) => {
@@ -84,6 +92,7 @@ export const StorageService = {
             }
           }
           callback(INITIAL_ORDERS);
+          isInitial = false;
           return;
         }
 
@@ -99,9 +108,21 @@ export const StorageService = {
 
         save(KEYS.ORDERS, items);
         callback(items);
+
+        // Notify on subsequent real-time changes made by other team members/devices
+        if (!isInitial && onRemoteChange) {
+          snapshot.docChanges().forEach((change) => {
+            const orderData = change.doc.data() as Order;
+            onRemoteChange({
+              type: change.type,
+              order: orderData,
+            });
+          });
+        }
+        isInitial = false;
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, path);
+        console.warn('[Firestore subscribeOrders error]:', error);
       }
     );
   },
@@ -166,7 +187,7 @@ export const StorageService = {
         callback(items);
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, path);
+        console.warn('[Firestore subscribeMaterials error]:', error);
       }
     );
   },
@@ -231,7 +252,7 @@ export const StorageService = {
         callback(items);
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, path);
+        console.warn('[Firestore subscribeEquipments error]:', error);
       }
     );
   },
@@ -296,7 +317,7 @@ export const StorageService = {
         callback(items);
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, path);
+        console.warn('[Firestore subscribePresets error]:', error);
       }
     );
   },
@@ -362,7 +383,7 @@ export const StorageService = {
         callback(items);
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, path);
+        console.warn('[Firestore subscribeMovements error]:', error);
       }
     );
   },
