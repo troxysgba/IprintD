@@ -23,6 +23,7 @@ import {
 
 interface OrdersViewProps {
   orders: Order[];
+  highlightOrderId?: string | null;
   onOpenGerarPedido: () => void;
   onEditOrder: (order: Order) => void;
   onDeleteOrder: (orderId: string) => void;
@@ -42,6 +43,7 @@ const STATUS_LABELS: Record<OrderStatus, { label: string; color: string }> = {
 
 export const OrdersView: React.FC<OrdersViewProps> = ({
   orders,
+  highlightOrderId,
   onOpenGerarPedido,
   onEditOrder,
   onDeleteOrder,
@@ -52,6 +54,14 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTab, setFilterTab] = useState<'todos' | 'orcamentos' | 'producao' | 'prontos' | 'concluidos'>('todos');
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+
+  // If a new order was just generated, automatically ensure it is visible in 'todos' filter
+  React.useEffect(() => {
+    if (highlightOrderId) {
+      setFilterTab('todos');
+      setSearchTerm('');
+    }
+  }, [highlightOrderId]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter((ord) => {
@@ -224,10 +234,16 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
             const next = getNextStage(ord.status);
             const statusConfig = STATUS_LABELS[ord.status] || STATUS_LABELS.orcamento;
 
+            const isNewlyCreated = ord.id === highlightOrderId;
+
             return (
               <div
                 key={ord.id}
-                className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs hover:border-slate-300 transition-all space-y-3 text-xs"
+                className={`bg-white p-4 sm:p-5 rounded-xl border transition-all space-y-3 text-xs ${
+                  isNewlyCreated
+                    ? 'border-amber-400 ring-2 ring-amber-400/40 bg-amber-50/15 shadow-md'
+                    : 'border-slate-200 shadow-2xs hover:border-slate-300'
+                }`}
               >
                 {/* Header row */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
@@ -235,6 +251,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                     <span className="font-mono font-bold text-sm text-slate-900">
                       {ord.code}
                     </span>
+                    {isNewlyCreated && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-400 text-slate-950 flex items-center gap-1 shadow-xs animate-pulse">
+                        ✨ Novo Pedido
+                      </span>
+                    )}
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${statusConfig.color}`}>
                       {statusConfig.label}
                     </span>

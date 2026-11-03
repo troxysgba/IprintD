@@ -415,8 +415,11 @@ export const StorageService = {
 
   async deductStockForOrder(order: Order): Promise<void> {
     if (order.stockDeducted) return;
-    if (order.materialId && (order.sheetsNeeded || order.wasteSheets)) {
-      const totalToDeduct = (order.sheetsNeeded || 0) + (order.wasteSheets || 0);
+    const totalToDeduct =
+      (order.sheetsNeeded || 0) + (order.wasteSheets || 0) ||
+      (order.linearMetersNeeded ? Math.ceil(order.linearMetersNeeded) : 0);
+
+    if (order.materialId && totalToDeduct > 0) {
       await this.recordStockMovement(
         order.materialId,
         'consumo_os',

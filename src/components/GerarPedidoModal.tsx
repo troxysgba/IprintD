@@ -398,6 +398,7 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
       depreciationCost: costResult?.depreciationCost || 0,
       depreciationPercent: costResult?.depreciationPercent ?? selectedEquipment?.depreciationPercent ?? 10,
       totalCost: costResult?.totalCost || 0,
+      markupPercent,
       suggestedPrice: costResult?.suggestedPrices.recommended.price || activeTotalPrice,
       finalPrice: activeTotalPrice,
       unitPrice: activeUnitPrice,
@@ -1145,15 +1146,15 @@ export const GerarPedidoModal: React.FC<GerarPedidoModalProps> = ({
             <button
               type="button"
               onClick={() => handleSave('pedido')}
-              className="flex-1 sm:flex-none px-5 py-2.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-md transition-colors cursor-pointer flex items-center justify-center gap-2"
+              className="flex-1 sm:flex-none px-6 py-2.5 text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl shadow-md transition-all hover:scale-102 active:scale-98 cursor-pointer flex items-center justify-center gap-2"
             >
-              <CheckCircle2 className="w-4 h-4 text-amber-400" />
+              <CheckCircle2 className="w-4 h-4 text-slate-950" />
               <span>
                 {initialOrderData?.id
                   ? initialOrderData.type === 'pedido'
                     ? 'Salvar Alterações do Pedido'
-                    : 'Converter em Pedido (OS)'
-                  : 'Gerar Pedido (OS)'}
+                    : 'Converter em Pedido'
+                  : 'Gerar Pedido'}
               </span>
             </button>
           </div>

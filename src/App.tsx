@@ -86,9 +86,25 @@ export default function App() {
     };
   }, []);
 
+  const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
+
   // Save order directly to Firestore (synchronized across all connected users instantly)
   const handleSaveOrder = async (newOrder: Order) => {
     const isEdit = orders.some((o) => o.id === newOrder.id);
+
+    // 1. Immediate optimistic state update for 0ms UI delay
+    setOrders((prev) => {
+      const exists = prev.some((o) => o.id === newOrder.id);
+      return exists ? prev.map((o) => (o.id === newOrder.id ? newOrder : o)) : [newOrder, ...prev];
+    });
+
+    // 2. Highlight newly created order on Pedidos view
+    setHighlightOrderId(newOrder.id);
+
+    // 3. User requirement: Automatically switch view to "pedidos"
+    setActivePage('pedidos');
+
+    // 4. Persist to Firestore and record stock movements
     await StorageService.saveOrder(newOrder);
 
     if (newOrder.type === 'pedido') {
@@ -97,7 +113,7 @@ export default function App() {
 
     showToast(
       `${newOrder.type === 'pedido' ? 'Pedido' : 'Orçamento'} ${newOrder.code} ${
-        isEdit ? 'atualizado e salvo na nuvem' : 'criado e compartilhado na nuvem'
+        isEdit ? 'atualizado e sincronizado' : 'gerado com sucesso e lançado na página Pedidos'
       }!`
     );
   };
@@ -243,6 +259,7 @@ export default function App() {
         {activePage === 'pedidos' && (
           <OrdersView
             orders={orders}
+            highlightOrderId={highlightOrderId}
             onOpenGerarPedido={() => handleOpenGerarPedido()}
             onEditOrder={handleEditOrder}
             onDeleteOrder={handleDeleteOrder}
