@@ -90,7 +90,11 @@ export const StorageService = {
     return load<QuickProductPreset[]>(KEYS.PRESETS, INITIAL_PRESETS);
   },
   getProducts(): RegisteredProduct[] {
-    return load<RegisteredProduct[]>(KEYS.PRODUCTS, INITIAL_PRODUCTS);
+    const cached = load<RegisteredProduct[]>(KEYS.PRODUCTS, INITIAL_PRODUCTS);
+    if (!cached || !Array.isArray(cached) || cached.length === 0) {
+      return INITIAL_PRODUCTS;
+    }
+    return cached;
   },
 
   // 1. ORDERS - REAL-TIME FIRESTORE MULTI-USER SYNC
@@ -566,8 +570,7 @@ export const StorageService = {
     return onSnapshot(
       collection(db, path),
       async (snapshot) => {
-        if (snapshot.empty && !localStorage.getItem(KEYS.SEEDED + '_products')) {
-          localStorage.setItem(KEYS.SEEDED + '_products', 'true');
+        if (snapshot.empty) {
           for (const p of INITIAL_PRODUCTS) {
             try {
               const cleanP = sanitizeForFirestore(p);
@@ -576,6 +579,7 @@ export const StorageService = {
               console.warn('Seeding product failed:', err);
             }
           }
+          save(KEYS.PRODUCTS, INITIAL_PRODUCTS);
           callback(INITIAL_PRODUCTS);
           isInitial = false;
           return;
