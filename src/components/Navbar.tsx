@@ -5,6 +5,7 @@ import {
   Calculator,
   Cpu,
   LayoutDashboard,
+  Package,
   PlusCircle,
   Printer,
   ShoppingBag,
@@ -16,6 +17,7 @@ interface NavbarProps {
   onOpenGerarPedido: () => void;
   ordersInProductionCount: number;
   lowStockCount: number;
+  productsCount?: number;
   isCloudConnected?: boolean;
 }
 
@@ -25,6 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenGerarPedido,
   ordersInProductionCount,
   lowStockCount,
+  productsCount = 0,
   isCloudConnected = true,
 }) => {
   const navItems = [
@@ -38,6 +41,13 @@ export const Navbar: React.FC<NavbarProps> = ({
       label: 'Pedidos',
       icon: ShoppingBag,
       badge: ordersInProductionCount > 0 ? ordersInProductionCount : undefined,
+    },
+    {
+      id: 'produtos' as ActivePage,
+      label: 'Produtos',
+      icon: Package,
+      badge: productsCount > 0 ? productsCount : undefined,
+      badgeColor: 'bg-amber-100 text-amber-900',
     },
     {
       id: 'calculo_custo' as ActivePage,

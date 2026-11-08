@@ -12,6 +12,7 @@ import {
   OrderStatus,
   PaymentStatus,
   QuickProductPreset,
+  RegisteredProduct,
   StockMovement,
 } from './types';
 import { StorageService } from './services/storageService';
@@ -20,6 +21,7 @@ import { GerarPedidoModal } from './components/GerarPedidoModal';
 import { JobTicketModal } from './components/JobTicketModal';
 import { OverviewView } from './views/OverviewView';
 import { OrdersView } from './views/OrdersView';
+import { ProductsView } from './views/ProductsView';
 import { CostCalculatorView } from './views/CostCalculatorView';
 import { InventoryView } from './views/InventoryView';
 import { MachinesView } from './views/MachinesView';
@@ -30,6 +32,7 @@ export default function App() {
 
   // Application Data States (Initialized with local cache, updated live from Firestore)
   const [orders, setOrders] = useState<Order[]>(StorageService.getOrders());
+  const [products, setProducts] = useState<RegisteredProduct[]>(StorageService.getProducts());
   const [materials, setMaterials] = useState<Material[]>(StorageService.getMaterials());
   const [equipments, setEquipments] = useState<Equipment[]>(StorageService.getEquipments());
   const [movements, setMovements] = useState<StockMovement[]>(StorageService.getStockMovements());
@@ -84,6 +87,21 @@ export default function App() {
       setPresets(livePresets);
     });
 
+    const unsubProducts = StorageService.subscribeProducts(
+      (liveProducts) => {
+        setProducts(liveProducts);
+      },
+      (change) => {
+        if (change.type === 'added') {
+          showToast(`📦 [Catálogo] Produto "${change.product.name}" adicionado na nuvem!`);
+        } else if (change.type === 'modified') {
+          showToast(`🔄 [Catálogo] Produto "${change.product.name}" atualizado na nuvem!`);
+        } else if (change.type === 'removed') {
+          showToast(`🗑️ [Catálogo] Produto "${change.product.name}" excluído.`);
+        }
+      }
+    );
+
     const unsubMovements = StorageService.subscribeStockMovements((liveMovements) => {
       setMovements(liveMovements);
     });
@@ -93,6 +111,7 @@ export default function App() {
       unsubMaterials();
       unsubEquipments();
       unsubPresets();
+      unsubProducts();
       unsubMovements();
     };
   }, []);
@@ -230,6 +249,51 @@ export default function App() {
     showToast(`Modelo "${pToDelete?.label || ''}" removido.`);
   };
 
+  // Products handlers (Produtos Cadastrados)
+  const handleSaveProduct = async (product: RegisteredProduct) => {
+    const isEdit = products.some((p) => p.id === product.id);
+    setProducts((prev) => {
+      const exists = prev.some((p) => p.id === product.id);
+      return exists ? prev.map((p) => (p.id === product.id ? product : p)) : [product, ...prev];
+    });
+    await StorageService.saveProduct(product);
+    showToast(
+      isEdit
+        ? `Produto "${product.name}" atualizado com sucesso!`
+        : `Produto "${product.name}" cadastrado com sucesso!`
+    );
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    const pToDelete = products.find((p) => p.id === productId);
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    await StorageService.deleteProduct(productId);
+    showToast(`Produto "${pToDelete?.name || ''}" removido da nuvem.`);
+  };
+
+  const handleUpdateProductStock = async (productId: string, newQuantity: number) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, stockQuantity: newQuantity } : p))
+    );
+    await StorageService.updateProductStock(productId, newQuantity);
+    showToast(`Estoque atualizado para ${newQuantity} un.`);
+  };
+
+  const handleGenerateOrderForProduct = (product: RegisteredProduct) => {
+    handleOpenGerarPedido({
+      productName: product.name,
+      quantity: 1,
+      finalPrice: product.price,
+      unitPrice: product.price,
+      suggestedPrice: product.price,
+      widthCm: product.widthCm || 9,
+      heightCm: product.heightCm || 5,
+      notes: product.description
+        ? `Item do catálogo (${product.code}): ${product.description}`
+        : `Item do catálogo (${product.code})`,
+    });
+  };
+
   const ordersInProductionCount = orders.filter(
     (o) => o.type === 'pedido' && ['aprovado', 'em_producao'].includes(o.status)
   ).length;
@@ -253,6 +317,7 @@ export default function App() {
         onOpenGerarPedido={() => handleOpenGerarPedido()}
         ordersInProductionCount={ordersInProductionCount}
         lowStockCount={lowStockCount}
+        productsCount={products.length}
         isCloudConnected={isCloudConnected}
       />
 
@@ -280,6 +345,16 @@ export default function App() {
             onUpdateStatus={handleUpdateOrderStatus}
             onUpdatePayment={handleUpdatePayment}
             onViewJobTicket={(ord) => setSelectedJobTicketOrder(ord)}
+          />
+        )}
+
+        {activePage === 'produtos' && (
+          <ProductsView
+            products={products}
+            onSaveProduct={handleSaveProduct}
+            onDeleteProduct={handleDeleteProduct}
+            onUpdateStock={handleUpdateProductStock}
+            onGenerateOrderForProduct={handleGenerateOrderForProduct}
           />
         )}
 

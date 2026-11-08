@@ -122,4 +122,22 @@ export interface QuickProductPreset {
   rollWidthCm?: number;
 }
 
-export type ActivePage = 'visao_geral' | 'pedidos' | 'calculo_custo' | 'estoque' | 'maquinas';
+export interface RegisteredProduct {
+  id: string;
+  code: string; // ex: PROD-101
+  name: string; // Nome do produto
+  category: string; // Papelaria, Comunicação Visual, Brindes, Adesivos, Impressão Digital, etc.
+  description?: string;
+  price: number; // Preço de venda
+  costPrice?: number; // Preço de custo estimado
+  stockQuantity: number; // Quantidade em estoque ou pronta entrega
+  minStock?: number; // Estoque mínimo para aviso
+  unit: string; // un, cento, milheiro, pct, m²
+  imageUrl?: string; // Imagem em base64 ou URL
+  widthCm?: number; // Largura em cm (opcional)
+  heightCm?: number; // Altura em cm (opcional)
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type ActivePage = 'visao_geral' | 'pedidos' | 'produtos' | 'calculo_custo' | 'estoque' | 'maquinas';

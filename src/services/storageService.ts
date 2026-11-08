@@ -6,12 +6,13 @@ import {
   setDoc,
   Unsubscribe,
 } from 'firebase/firestore';
-import { Equipment, Material, Order, QuickProductPreset, StockMovement } from '../types';
+import { Equipment, Material, Order, QuickProductPreset, RegisteredProduct, StockMovement } from '../types';
 import {
   INITIAL_EQUIPMENTS,
   INITIAL_MATERIALS,
   INITIAL_ORDERS,
   INITIAL_PRESETS,
+  INITIAL_PRODUCTS,
   INITIAL_STOCK_MOVEMENTS,
 } from '../utils/mockData';
 import { db, handleFirestoreError, OperationType, testConnection } from './firebase';
@@ -22,6 +23,7 @@ const KEYS = {
   EQUIPMENTS: 'iprint_equipments_v3',
   MOVEMENTS: 'iprint_movements_v3',
   PRESETS: 'iprint_presets_v3',
+  PRODUCTS: 'iprint_products_v3',
   SEEDED: 'iprint_firestore_seeded_v1',
 };
 
@@ -86,6 +88,9 @@ export const StorageService = {
   },
   getPresets(): QuickProductPreset[] {
     return load<QuickProductPreset[]>(KEYS.PRESETS, INITIAL_PRESETS);
+  },
+  getProducts(): RegisteredProduct[] {
+    return load<RegisteredProduct[]>(KEYS.PRODUCTS, INITIAL_PRODUCTS);
   },
 
   // 1. ORDERS - REAL-TIME FIRESTORE MULTI-USER SYNC
@@ -547,16 +552,125 @@ export const StorageService = {
     }
   },
 
+  // 6. PRODUCTS - REAL-TIME FIRESTORE MULTI-USER SYNC
+  subscribeProducts(
+    callback: (products: RegisteredProduct[]) => void,
+    onRemoteChange?: (change: {
+      type: 'added' | 'modified' | 'removed';
+      product: RegisteredProduct;
+    }) => void
+  ): Unsubscribe {
+    const path = 'products';
+    let isInitial = true;
+
+    return onSnapshot(
+      collection(db, path),
+      async (snapshot) => {
+        if (snapshot.empty && !localStorage.getItem(KEYS.SEEDED + '_products')) {
+          localStorage.setItem(KEYS.SEEDED + '_products', 'true');
+          for (const p of INITIAL_PRODUCTS) {
+            try {
+              const cleanP = sanitizeForFirestore(p);
+              await setDoc(doc(db, path, cleanP.id), cleanP);
+            } catch (err) {
+              console.warn('Seeding product failed:', err);
+            }
+          }
+          callback(INITIAL_PRODUCTS);
+          isInitial = false;
+          return;
+        }
+
+        const items: RegisteredProduct[] = [];
+        snapshot.forEach((d) => {
+          items.push(d.data() as RegisteredProduct);
+        });
+
+        items.sort((a, b) => a.name.localeCompare(b.name));
+        save(KEYS.PRODUCTS, items);
+        callback(items);
+
+        if (!isInitial && onRemoteChange) {
+          snapshot.docChanges().forEach((change) => {
+            const prodData = change.doc.data() as RegisteredProduct;
+            onRemoteChange({
+              type: change.type,
+              product: prodData,
+            });
+          });
+        }
+        isInitial = false;
+      },
+      (error) => {
+        console.warn('[Firestore subscribeProducts error]:', error);
+      }
+    );
+  },
+
+  async saveProduct(product: RegisteredProduct): Promise<void> {
+    const path = 'products';
+    const cleanProduct = sanitizeForFirestore(product);
+
+    try {
+      const current = this.getProducts();
+      const exists = current.some((p) => p.id === cleanProduct.id);
+      const updated = exists
+        ? current.map((p) => (p.id === cleanProduct.id ? cleanProduct : p))
+        : [cleanProduct, ...current];
+      save(KEYS.PRODUCTS, updated);
+    } catch (err) {
+      console.warn('[LocalStorage saveProduct error]:', err);
+    }
+
+    try {
+      await setDoc(doc(db, path, cleanProduct.id), cleanProduct);
+    } catch (error) {
+      console.error('[Firestore saveProduct error]:', error);
+      handleFirestoreError(error, OperationType.WRITE, `${path}/${cleanProduct.id}`);
+    }
+  },
+
+  async deleteProduct(productId: string): Promise<void> {
+    const path = 'products';
+    try {
+      const filtered = this.getProducts().filter((p) => p.id !== productId);
+      save(KEYS.PRODUCTS, filtered);
+    } catch (err) {
+      console.warn('[LocalStorage deleteProduct error]:', err);
+    }
+
+    try {
+      await deleteDoc(doc(db, path, productId));
+    } catch (error) {
+      console.error('[Firestore deleteProduct error]:', error);
+      handleFirestoreError(error, OperationType.DELETE, `${path}/${productId}`);
+    }
+  },
+
+  async updateProductStock(productId: string, newQuantity: number): Promise<void> {
+    const products = this.getProducts();
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) return;
+    const updated: RegisteredProduct = {
+      ...prod,
+      stockQuantity: Math.max(0, newQuantity),
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveProduct(updated);
+  },
+
   resetAll(): void {
     localStorage.removeItem(KEYS.ORDERS);
     localStorage.removeItem(KEYS.MATERIALS);
     localStorage.removeItem(KEYS.EQUIPMENTS);
     localStorage.removeItem(KEYS.MOVEMENTS);
     localStorage.removeItem(KEYS.PRESETS);
+    localStorage.removeItem(KEYS.PRODUCTS);
     localStorage.removeItem(KEYS.SEEDED + '_orders');
     localStorage.removeItem(KEYS.SEEDED + '_materials');
     localStorage.removeItem(KEYS.SEEDED + '_equipments');
     localStorage.removeItem(KEYS.SEEDED + '_presets');
+    localStorage.removeItem(KEYS.SEEDED + '_products');
     localStorage.removeItem(KEYS.SEEDED + '_movements');
   },
 };

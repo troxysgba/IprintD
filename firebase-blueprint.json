@@ -128,6 +128,29 @@
         "notes": { "type": "string", "maxLength": 500 }
       },
       "required": ["id", "materialId", "materialName", "date", "type", "quantity"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Produtos cadastrados para venda rápida e controle de estoque",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "price": { "type": "number" },
+        "costPrice": { "type": "number" },
+        "stockQuantity": { "type": "number" },
+        "minStock": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 30 },
+        "imageUrl": { "type": "string" },
+        "widthCm": { "type": "number" },
+        "heightCm": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "code", "name", "price", "stockQuantity", "unit"]
     }
   },
   "firestore": {
@@ -150,6 +173,10 @@
     "/stockMovements/{movementId}": {
       "schema": { "$ref": "#/entities/StockMovement" },
       "description": "Histórico de movimentações de estoque"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Catálogo de produtos cadastrados com foto, preço e estoque"
     }
   }
 }
