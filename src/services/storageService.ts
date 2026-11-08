@@ -67,6 +67,15 @@ export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): T {
   return result as T;
 }
 
+// Initial product IDs to be pruned if previously seeded so only 2 examples remain
+const DEPRECATED_INITIAL_PRODUCT_IDS = [
+  'prod_adesivo_vinil',
+  'prod_caneca_porcelana',
+  'prod_panfleto_10x15',
+  'prod_bloco_pedidos',
+  'prod_cracha_pvc',
+];
+
 export const StorageService = {
   // Test connection
   initConnection(): void {
@@ -90,7 +99,8 @@ export const StorageService = {
     return load<QuickProductPreset[]>(KEYS.PRESETS, INITIAL_PRESETS);
   },
   getProducts(): RegisteredProduct[] {
-    return load<RegisteredProduct[]>(KEYS.PRODUCTS, INITIAL_PRODUCTS);
+    const raw = load<RegisteredProduct[]>(KEYS.PRODUCTS, INITIAL_PRODUCTS);
+    return raw.filter((p) => !DEPRECATED_INITIAL_PRODUCT_IDS.includes(p.id));
   },
 
   // 1. ORDERS - REAL-TIME FIRESTORE MULTI-USER SYNC
@@ -566,8 +576,8 @@ export const StorageService = {
     return onSnapshot(
       collection(db, path),
       async (snapshot) => {
-        if (snapshot.empty && !localStorage.getItem(KEYS.SEEDED + '_products')) {
-          localStorage.setItem(KEYS.SEEDED + '_products', 'true');
+        if (snapshot.empty && !localStorage.getItem(KEYS.SEEDED + '_products_v2')) {
+          localStorage.setItem(KEYS.SEEDED + '_products_v2', 'true');
           for (const p of INITIAL_PRODUCTS) {
             try {
               const cleanP = sanitizeForFirestore(p);
@@ -582,9 +592,24 @@ export const StorageService = {
         }
 
         const items: RegisteredProduct[] = [];
+        const deprecatedFound: string[] = [];
         snapshot.forEach((d) => {
-          items.push(d.data() as RegisteredProduct);
+          const data = d.data() as RegisteredProduct;
+          if (DEPRECATED_INITIAL_PRODUCT_IDS.includes(data.id)) {
+            deprecatedFound.push(data.id);
+          } else {
+            items.push(data);
+          }
         });
+
+        // Background cleanup of deprecated initial products from Firestore
+        if (deprecatedFound.length > 0) {
+          for (const depId of deprecatedFound) {
+            deleteDoc(doc(db, path, depId)).catch((err) => {
+              console.warn('Cleanup of deprecated product failed:', err);
+            });
+          }
+        }
 
         items.sort((a, b) => a.name.localeCompare(b.name));
         save(KEYS.PRODUCTS, items);
@@ -593,10 +618,12 @@ export const StorageService = {
         if (!isInitial && onRemoteChange) {
           snapshot.docChanges().forEach((change) => {
             const prodData = change.doc.data() as RegisteredProduct;
-            onRemoteChange({
-              type: change.type,
-              product: prodData,
-            });
+            if (!DEPRECATED_INITIAL_PRODUCT_IDS.includes(prodData.id)) {
+              onRemoteChange({
+                type: change.type,
+                product: prodData,
+              });
+            }
           });
         }
         isInitial = false;
