@@ -1,11 +1,13 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { RegisteredProduct } from '../types';
 import { formatBRL } from '../utils/calculator';
 import {
+  AlertCircle,
   AlertTriangle,
   Boxes,
   Camera,
   Check,
+  CheckCircle2,
   ChevronDown,
   Cloud,
   Edit2,
@@ -16,20 +18,30 @@ import {
   Pencil,
   Plus,
   PlusCircle,
+  RefreshCw,
   Search,
   ShoppingCart,
+  Sparkles,
   Tag,
   Trash2,
   Upload,
   Users,
   X,
+  Zap,
 } from 'lucide-react';
 
 interface ProductsViewProps {
   products: RegisteredProduct[];
+  lastModifiedProductId?: string | null;
+  lastProductChange?: {
+    type: 'added' | 'modified' | 'removed';
+    product: RegisteredProduct;
+    time: string;
+  } | null;
   onSaveProduct: (product: RegisteredProduct) => Promise<void>;
   onDeleteProduct: (productId: string) => Promise<void>;
   onUpdateStock: (productId: string, newQuantity: number) => Promise<void>;
+  onUpdatePrice: (productId: string, newPrice: number) => Promise<void>;
   onGenerateOrderForProduct: (product: RegisteredProduct) => void;
 }
 
@@ -55,9 +67,12 @@ const UNIT_OPTIONS = [
 
 export const ProductsView: React.FC<ProductsViewProps> = ({
   products,
+  lastModifiedProductId,
+  lastProductChange,
   onSaveProduct,
   onDeleteProduct,
   onUpdateStock,
+  onUpdatePrice,
   onGenerateOrderForProduct,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,18 +81,19 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   const [editingProduct, setEditingProduct] = useState<RegisteredProduct | null>(null);
   const [productToDelete, setProductToDelete] = useState<RegisteredProduct | null>(null);
 
-  // Quick inline stock editing feedback
+  // Inline price quick-edit state
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [inlinePriceInput, setInlinePriceInput] = useState<string>('');
+
+  // Inline stock feedback state
   const [updatingStockId, setUpdatingStockId] = useState<string | null>(null);
 
-  // Filtered products
+  // Filtered products list
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      // Category filter
       if (selectedCategory !== 'Todos' && p.category !== selectedCategory) {
         return false;
       }
-
-      // Search filter
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         const mName = p.name.toLowerCase().includes(q);
@@ -86,7 +102,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         const mDesc = (p.description || '').toLowerCase().includes(q);
         return mName || mCode || mCat || mDesc;
       }
-
       return true;
     });
   }, [products, selectedCategory, searchTerm]);
@@ -111,11 +126,26 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
     setIsModalOpen(true);
   };
 
+  // Quick inline stock modification (persisted to Firestore instantly)
   const handleStockQuickChange = async (productId: string, currentStock: number, delta: number) => {
     const next = Math.max(0, currentStock + delta);
     setUpdatingStockId(productId);
     await onUpdateStock(productId, next);
-    setTimeout(() => setUpdatingStockId(null), 600);
+    setTimeout(() => setUpdatingStockId(null), 500);
+  };
+
+  // Quick inline price modification (persisted to Firestore instantly)
+  const handleStartEditPrice = (product: RegisteredProduct) => {
+    setEditingPriceId(product.id);
+    setInlinePriceInput(product.price.toString());
+  };
+
+  const handleSaveInlinePrice = async (productId: string) => {
+    const val = parseFloat(inlinePriceInput);
+    if (!isNaN(val) && val >= 0) {
+      await onUpdatePrice(productId, val);
+    }
+    setEditingPriceId(null);
   };
 
   return (
@@ -128,16 +158,16 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
               <span className="text-[11px] font-mono font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 uppercase">
                 Catálogo Geral
               </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Sincronizado na Nuvem
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Banco de Dados em Tempo Real Ativo</span>
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 mt-1">
               Produtos Cadastrados
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Gerencie seus produtos com fotos, tabela de preços de venda e controle de quantidade em estoque em tempo real.
+              Toda a equipe pode editar o mesmo catálogo simultaneamente: fotos, preços e estoques são sincronizados na nuvem na mesma hora.
             </p>
           </div>
 
@@ -150,28 +180,38 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           </button>
         </div>
 
-        {/* Real-time sync explanation banner */}
-        <div className="bg-gradient-to-r from-amber-50/70 via-slate-50 to-emerald-50/60 border border-slate-200/90 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-start sm:items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-700 flex items-center justify-center shrink-0">
-              <Cloud className="w-4 h-4 text-amber-600 animate-pulse" />
+        {/* Real-time multi-user live banner */}
+        <div className="bg-gradient-to-r from-amber-50/80 via-slate-50 to-emerald-50/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+          <div className="flex items-start md:items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4 text-emerald-600 animate-bounce" />
             </div>
             <div>
-              <div className="font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
-                <span>Catálogo de Produtos em Tempo Real</span>
+              <div className="font-bold text-slate-900 flex items-center gap-2 flex-wrap">
+                <span>Edição Simultânea na Nuvem (Multi-Usuário)</span>
+                <span className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-full font-mono text-slate-600">
+                  Firebase Firestore
+                </span>
               </div>
               <p className="text-[11px] text-slate-600 mt-0.5">
-                Qualquer operador pode adicionar fotos, alterar preços e atualizar estoques. As alterações aparecem imediatamente em todos os computadores e celulares conectados.
+                Altere o preço ou estoque direto no card ou pelo modal. A mudança aparece na tela de todos os computadores e celulares conectados no mesmo instante.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+
+          {/* Real-time Activity Ticker */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {lastProductChange && (
+              <div className="inline-flex items-center gap-1.5 text-[11px] bg-white border border-emerald-300 text-emerald-800 px-2.5 py-1 rounded-lg shadow-2xs animate-in fade-in">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span className="font-medium truncate max-w-[200px]">
+                  <strong>{lastProductChange.product.name}</strong> atualizado às {lastProductChange.time}
+                </span>
+              </div>
+            )}
             <span className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-slate-800 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-2xs">
               <Package className="w-3.5 h-3.5 text-amber-600" />
               <span>{totalProducts} produtos</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
-              <span>{formatBRL(totalInventoryValue)} em estoque</span>
             </span>
           </div>
         </div>
@@ -240,12 +280,25 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           {filteredProducts.map((prod) => {
             const isLowStock = prod.stockQuantity <= (prod.minStock ?? 5);
             const isOutOfStock = prod.stockQuantity === 0;
+            const isRecentlyUpdated = lastModifiedProductId === prod.id;
 
             return (
               <div
                 key={prod.id}
-                className="bg-white rounded-2xl border border-slate-200 shadow-2xs hover:shadow-sm transition-all duration-200 overflow-hidden flex flex-col group"
+                className={`bg-white rounded-2xl border shadow-2xs hover:shadow-sm transition-all duration-300 overflow-hidden flex flex-col group relative ${
+                  isRecentlyUpdated
+                    ? 'border-emerald-500 ring-2 ring-emerald-400/80 shadow-emerald-100'
+                    : 'border-slate-200'
+                }`}
               >
+                {/* Live Real-time Modification Tag */}
+                {isRecentlyUpdated && (
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 animate-pulse">
+                    <Zap className="w-3 h-3 text-amber-300" />
+                    <span>Atualizado na Nuvem Agora</span>
+                  </div>
+                )}
+
                 {/* Product Image Box */}
                 <div className="relative aspect-4/3 w-full bg-slate-100 overflow-hidden flex items-center justify-center border-b border-slate-100">
                   {prod.imageUrl ? (
@@ -254,7 +307,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                       alt={prod.name}
                       className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
                       onError={(e) => {
-                        // Fallback on broken image link
                         (e.target as HTMLElement).style.display = 'none';
                       }}
                     />
@@ -317,16 +369,69 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                     )}
                   </div>
 
-                  {/* Price & Stock Section */}
+                  {/* Price & Stock Section with Instant Collaborative Editing */}
                   <div className="space-y-2.5 pt-2 border-t border-slate-100">
                     <div className="flex items-baseline justify-between">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                          Preço de Venda
-                        </span>
-                        <div className="text-lg font-black font-mono text-slate-900">
-                          {formatBRL(prod.price)}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                            Preço de Venda
+                          </span>
+                          {editingPriceId !== prod.id && (
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditPrice(prod)}
+                              className="text-slate-400 hover:text-amber-600 cursor-pointer p-0.5 rounded"
+                              title="Editar preço rapidamente e salvar na nuvem"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
+
+                        {/* Inline price editor */}
+                        {editingPriceId === prod.id ? (
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="text-xs font-bold text-slate-400">R$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              autoFocus
+                              value={inlinePriceInput}
+                              onChange={(e) => setInlinePriceInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveInlinePrice(prod.id);
+                                if (e.key === 'Escape') setEditingPriceId(null);
+                              }}
+                              className="w-20 px-1.5 py-0.5 text-xs font-bold font-mono bg-amber-50 border border-amber-300 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSaveInlinePrice(prod.id)}
+                              className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
+                              title="Salvar preço e atualizar para todos"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingPriceId(null)}
+                              className="p-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded cursor-pointer"
+                              title="Cancelar"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => handleStartEditPrice(prod)}
+                            className="text-lg font-black font-mono text-slate-900 cursor-pointer hover:text-amber-700 transition-colors inline-block"
+                            title="Clique para editar o preço"
+                          >
+                            {formatBRL(prod.price)}
+                          </div>
+                        )}
                       </div>
 
                       {prod.costPrice && prod.costPrice > 0 && (
@@ -339,7 +444,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                       )}
                     </div>
 
-                    {/* Interactive Stock Quantity Editor */}
+                    {/* Interactive Stock Quantity Editor (Real-Time Synchronized) */}
                     <div className="bg-slate-50 p-2 rounded-xl border border-slate-200/80 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5">
                         <Boxes className="w-3.5 h-3.5 text-slate-500" />
@@ -351,7 +456,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                           type="button"
                           onClick={() => handleStockQuickChange(prod.id, prod.stockQuantity, -1)}
                           disabled={prod.stockQuantity <= 0}
-                          title="Diminuir 1 unidade"
+                          title="Diminuir 1 unidade (sincroniza com todos)"
                           className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
                         >
                           <Minus className="w-3 h-3" />
@@ -371,7 +476,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handleStockQuickChange(prod.id, prod.stockQuantity, 1)}
-                          title="Aumentar 1 unidade"
+                          title="Aumentar 1 unidade (sincroniza com todos)"
                           className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 cursor-pointer transition-colors shadow-2xs"
                         >
                           <Plus className="w-3 h-3" />
@@ -394,7 +499,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                     <button
                       onClick={() => handleOpenEditModal(prod)}
                       className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer transition-colors border border-slate-200"
-                      title="Editar dados, foto e preço deste produto"
+                      title="Editar foto, dados completos, preço e estoque"
                     >
                       <Pencil className="w-3.5 h-3.5 text-slate-600" />
                     </button>
@@ -402,7 +507,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                     <button
                       onClick={() => setProductToDelete(prod)}
                       className="p-1.5 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer transition-colors border border-red-200"
-                      title="Excluir este produto"
+                      title="Excluir este produto da nuvem"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -414,7 +519,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         </div>
       )}
 
-      {/* Modal: Adicionar / Editar Produto */}
+      {/* Modal: Adicionar / Editar Produto com Proteção de Conflito em Tempo Real */}
       {isModalOpen && (
         <ProductFormModal
           initialProduct={editingProduct}
@@ -467,7 +572,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                 </div>
               </div>
               <p className="text-[11px] text-red-500 font-medium">
-                Esta ação remove o produto da nuvem para toda a equipe.
+                Esta ação remove o produto do banco de dados na nuvem para toda a equipe.
               </p>
             </div>
 
@@ -529,6 +634,37 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [widthCm, setWidthCm] = useState<number | undefined>(initialProduct?.widthCm);
   const [heightCm, setHeightCm] = useState<number | undefined>(initialProduct?.heightCm);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Detect remote changes while modal is open
+  const latestRemoteProduct = useMemo(() => {
+    if (!initialProduct) return null;
+    return existingProducts.find((p) => p.id === initialProduct.id) || null;
+  }, [existingProducts, initialProduct]);
+
+  const hasRemoteConflict = useMemo(() => {
+    if (!initialProduct || !latestRemoteProduct) return false;
+    return (
+      latestRemoteProduct.updatedAt &&
+      initialProduct.updatedAt &&
+      latestRemoteProduct.updatedAt !== initialProduct.updatedAt
+    );
+  }, [initialProduct, latestRemoteProduct]);
+
+  const handleApplyLatestRemoteData = () => {
+    if (!latestRemoteProduct) return;
+    setName(latestRemoteProduct.name);
+    setCode(latestRemoteProduct.code);
+    setCategory(latestRemoteProduct.category);
+    setDescription(latestRemoteProduct.description || '');
+    setPrice(latestRemoteProduct.price);
+    setCostPrice(latestRemoteProduct.costPrice || 0);
+    setStockQuantity(latestRemoteProduct.stockQuantity);
+    setMinStock(latestRemoteProduct.minStock ?? 5);
+    setUnit(latestRemoteProduct.unit);
+    setImageUrl(latestRemoteProduct.imageUrl || '');
+    setWidthCm(latestRemoteProduct.widthCm);
+    setHeightCm(latestRemoteProduct.heightCm);
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -617,7 +753,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 {isEditing ? 'Editar Produto Cadastrado' : 'Cadastrar Novo Produto'}
               </h2>
               <p className="text-[11px] text-slate-400">
-                Preencha os dados, imagem, preço e quantidade em estoque.
+                Qualquer edição salva aqui será transmitida para todos os computadores na mesma hora.
               </p>
             </div>
           </div>
@@ -628,6 +764,26 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Remote Live Conflict Warning Banner */}
+        {hasRemoteConflict && latestRemoteProduct && (
+          <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center justify-between gap-3 text-xs text-amber-900">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Atenção:</strong> Outro membro da equipe acabou de editar este produto na nuvem (Preço: {formatBRL(latestRemoteProduct.price)} | Estoque: {latestRemoteProduct.stockQuantity} {latestRemoteProduct.unit}).
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleApplyLatestRemoteData}
+              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>Carregar Novos Dados</span>
+            </button>
+          </div>
+        )}
 
         {/* Modal Body Form */}
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 overflow-y-auto space-y-5 text-xs">
@@ -913,7 +1069,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm transition-all"
             >
               <Check className="w-4 h-4 text-amber-400" />
-              <span>{isEditing ? 'Salvar Alterações' : 'Cadastrar Produto'}</span>
+              <span>{isEditing ? 'Salvar Alterações e Sincronizar' : 'Cadastrar Produto na Nuvem'}</span>
             </button>
           </div>
         </form>

@@ -651,6 +651,18 @@ export const StorageService = {
     }
   },
 
+  async updateProductPrice(productId: string, newPrice: number): Promise<void> {
+    const products = this.getProducts();
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) return;
+    const updated: RegisteredProduct = {
+      ...prod,
+      price: Math.max(0, newPrice),
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveProduct(updated);
+  },
+
   async updateProductStock(productId: string, newQuantity: number): Promise<void> {
     const products = this.getProducts();
     const prod = products.find((p) => p.id === productId);

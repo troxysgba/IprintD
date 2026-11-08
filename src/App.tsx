@@ -55,6 +55,13 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+    const [lastModifiedProductId, setLastModifiedProductId] = useState<string | null>(null);
+  const [lastProductChange, setLastProductChange] = useState<{
+    type: 'added' | 'modified' | 'removed';
+    product: RegisteredProduct;
+    time: string;
+  } | null>(null);
+
   // Real-time multi-user synchronization with Firebase Firestore
   useEffect(() => {
     StorageService.initConnection();
@@ -92,12 +99,25 @@ export default function App() {
         setProducts(liveProducts);
       },
       (change) => {
+        const timeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastModifiedProductId(change.product.id);
+        setLastProductChange({
+          type: change.type,
+          product: change.product,
+          time: timeStr,
+        });
+
+        // Clear highlight ring after 4.5 seconds
+        setTimeout(() => {
+          setLastModifiedProductId((current) => (current === change.product.id ? null : current));
+        }, 4500);
+
         if (change.type === 'added') {
-          showToast(`📦 [Catálogo] Produto "${change.product.name}" adicionado na nuvem!`);
+          showToast(`📦 [Tempo Real] "${change.product.name}" adicionado à lista por outro operador!`);
         } else if (change.type === 'modified') {
-          showToast(`🔄 [Catálogo] Produto "${change.product.name}" atualizado na nuvem!`);
+          showToast(`⚡ [Tempo Real] "${change.product.name}" foi alterado agora! (Preço: R$ ${change.product.price.toFixed(2)} | Estoque: ${change.product.stockQuantity} un)`);
         } else if (change.type === 'removed') {
-          showToast(`🗑️ [Catálogo] Produto "${change.product.name}" excluído.`);
+          showToast(`🗑️ [Tempo Real] Produto "${change.product.name}" foi removido do catálogo.`);
         }
       }
     );
@@ -249,18 +269,27 @@ export default function App() {
     showToast(`Modelo "${pToDelete?.label || ''}" removido.`);
   };
 
-  // Products handlers (Produtos Cadastrados)
+  // Products handlers (Produtos Cadastrados com sincronização colaborativa em tempo real)
   const handleSaveProduct = async (product: RegisteredProduct) => {
     const isEdit = products.some((p) => p.id === product.id);
+    const updatedProd: RegisteredProduct = {
+      ...product,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Immediate optimistic update
     setProducts((prev) => {
-      const exists = prev.some((p) => p.id === product.id);
-      return exists ? prev.map((p) => (p.id === product.id ? product : p)) : [product, ...prev];
+      const exists = prev.some((p) => p.id === updatedProd.id);
+      return exists ? prev.map((p) => (p.id === updatedProd.id ? updatedProd : p)) : [updatedProd, ...prev];
     });
-    await StorageService.saveProduct(product);
+
+    setLastModifiedProductId(updatedProd.id);
+    await StorageService.saveProduct(updatedProd);
+
     showToast(
       isEdit
-        ? `Produto "${product.name}" atualizado com sucesso!`
-        : `Produto "${product.name}" cadastrado com sucesso!`
+        ? `Produto "${product.name}" atualizado e propagado em tempo real para toda a equipe!`
+        : `Produto "${product.name}" cadastrado e disponível em tempo real!`
     );
   };
 
@@ -273,10 +302,20 @@ export default function App() {
 
   const handleUpdateProductStock = async (productId: string, newQuantity: number) => {
     setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, stockQuantity: newQuantity } : p))
+      prev.map((p) => (p.id === productId ? { ...p, stockQuantity: newQuantity, updatedAt: new Date().toISOString() } : p))
     );
+    setLastModifiedProductId(productId);
     await StorageService.updateProductStock(productId, newQuantity);
-    showToast(`Estoque atualizado para ${newQuantity} un.`);
+    showToast(`Estoque atualizado para ${newQuantity} un e sincronizado com a equipe!`);
+  };
+
+  const handleUpdateProductPrice = async (productId: string, newPrice: number) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, price: newPrice, updatedAt: new Date().toISOString() } : p))
+    );
+    setLastModifiedProductId(productId);
+    await StorageService.updateProductPrice(productId, newPrice);
+    showToast(`Preço atualizado para R$ ${newPrice.toFixed(2)} e sincronizado na nuvem!`);
   };
 
   const handleGenerateOrderForProduct = (product: RegisteredProduct) => {
@@ -351,9 +390,12 @@ export default function App() {
         {activePage === 'produtos' && (
           <ProductsView
             products={products}
+            lastModifiedProductId={lastModifiedProductId}
+            lastProductChange={lastProductChange}
             onSaveProduct={handleSaveProduct}
             onDeleteProduct={handleDeleteProduct}
             onUpdateStock={handleUpdateProductStock}
+            onUpdatePrice={handleUpdateProductPrice}
             onGenerateOrderForProduct={handleGenerateOrderForProduct}
           />
         )}
