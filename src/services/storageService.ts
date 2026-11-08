@@ -390,7 +390,10 @@ export const StorageService = {
 
         const items: QuickProductPreset[] = [];
         snapshot.forEach((d) => {
-          items.push(d.data() as QuickProductPreset);
+          const data = d.data();
+          if (!data.isRegisteredProduct && !d.id.startsWith('prod_')) {
+            items.push(data as QuickProductPreset);
+          }
         });
         save(KEYS.PRESETS, items);
         callback(items);
@@ -556,7 +559,7 @@ export const StorageService = {
     }
   },
 
-  // 6. PRODUCTS - REAL-TIME FIRESTORE MULTI-USER SYNC
+  // 6. PRODUCTS - REAL-TIME FIRESTORE MULTI-USER SYNC (Stored in cloud with instant broadcast)
   subscribeProducts(
     callback: (products: RegisteredProduct[]) => void,
     onRemoteChange?: (change: {
@@ -564,16 +567,29 @@ export const StorageService = {
       product: RegisteredProduct;
     }) => void
   ): Unsubscribe {
-    const path = 'products';
+    const path = 'presets';
     let isInitial = true;
 
     return onSnapshot(
       collection(db, path),
       async (snapshot) => {
-        if (snapshot.empty) {
+        const productItems: RegisteredProduct[] = [];
+        snapshot.forEach((d) => {
+          const data = d.data();
+          if (data.isRegisteredProduct || d.id.startsWith('prod_')) {
+            productItems.push(data as RegisteredProduct);
+          }
+        });
+
+        if (productItems.length === 0) {
           for (const p of INITIAL_PRODUCTS) {
             try {
-              const cleanP = sanitizeForFirestore(p);
+              const cleanP = sanitizeForFirestore({
+                ...p,
+                label: p.code || p.name,
+                isRegisteredProduct: true,
+                updatedAt: new Date().toISOString(),
+              });
               await setDoc(doc(db, path, cleanP.id), cleanP);
             } catch (err) {
               console.warn('Seeding product failed:', err);
@@ -585,22 +601,19 @@ export const StorageService = {
           return;
         }
 
-        const items: RegisteredProduct[] = [];
-        snapshot.forEach((d) => {
-          items.push(d.data() as RegisteredProduct);
-        });
-
-        items.sort((a, b) => a.name.localeCompare(b.name));
-        save(KEYS.PRODUCTS, items);
-        callback(items);
+        productItems.sort((a, b) => a.name.localeCompare(b.name));
+        save(KEYS.PRODUCTS, productItems);
+        callback(productItems);
 
         if (!isInitial && onRemoteChange) {
           snapshot.docChanges().forEach((change) => {
-            const prodData = change.doc.data() as RegisteredProduct;
-            onRemoteChange({
-              type: change.type,
-              product: prodData,
-            });
+            const data = change.doc.data();
+            if (data.isRegisteredProduct || change.doc.id.startsWith('prod_')) {
+              onRemoteChange({
+                type: change.type,
+                product: data as RegisteredProduct,
+              });
+            }
           });
         }
         isInitial = false;
@@ -612,8 +625,13 @@ export const StorageService = {
   },
 
   async saveProduct(product: RegisteredProduct): Promise<void> {
-    const path = 'products';
-    const cleanProduct = sanitizeForFirestore(product);
+    const path = 'presets';
+    const cleanProduct = sanitizeForFirestore({
+      ...product,
+      label: product.code || product.name,
+      isRegisteredProduct: true,
+      updatedAt: new Date().toISOString(),
+    });
 
     try {
       const current = this.getProducts();
@@ -635,7 +653,7 @@ export const StorageService = {
   },
 
   async deleteProduct(productId: string): Promise<void> {
-    const path = 'products';
+    const path = 'presets';
     try {
       const filtered = this.getProducts().filter((p) => p.id !== productId);
       save(KEYS.PRODUCTS, filtered);

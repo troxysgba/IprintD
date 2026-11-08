@@ -1,14 +1,13 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { RegisteredProduct } from '../types';
-import { formatBRL } from '../utils/calculator';
+import { formatBRL, formatDate } from '../utils/calculator';
 import {
-  AlertCircle,
   AlertTriangle,
+  ArrowRight,
   Boxes,
   Camera,
   Check,
   CheckCircle2,
-  ChevronDown,
   Cloud,
   Edit2,
   Image as ImageIcon,
@@ -24,6 +23,7 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  TrendingUp,
   Upload,
   Users,
   X,
@@ -81,14 +81,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   const [editingProduct, setEditingProduct] = useState<RegisteredProduct | null>(null);
   const [productToDelete, setProductToDelete] = useState<RegisteredProduct | null>(null);
 
-  // Inline price quick-edit state
+  // Quick inline price editor
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [inlinePriceInput, setInlinePriceInput] = useState<string>('');
 
-  // Inline stock feedback state
-  const [updatingStockId, setUpdatingStockId] = useState<string | null>(null);
-
-  // Filtered products list
+  // Filtered products
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       if (selectedCategory !== 'Todos' && p.category !== selectedCategory) {
@@ -106,16 +103,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
     });
   }, [products, selectedCategory, searchTerm]);
 
-  // Statistics
-  const totalProducts = products.length;
-  const lowStockProducts = products.filter(
-    (p) => p.stockQuantity <= (p.minStock ?? 5)
-  ).length;
-  const totalInventoryValue = products.reduce(
-    (sum, p) => sum + p.price * p.stockQuantity,
-    0
-  );
-
   const handleOpenAddModal = () => {
     setEditingProduct(null);
     setIsModalOpen(true);
@@ -126,15 +113,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
     setIsModalOpen(true);
   };
 
-  // Quick inline stock modification (persisted to Firestore instantly)
   const handleStockQuickChange = async (productId: string, currentStock: number, delta: number) => {
     const next = Math.max(0, currentStock + delta);
-    setUpdatingStockId(productId);
     await onUpdateStock(productId, next);
-    setTimeout(() => setUpdatingStockId(null), 500);
   };
 
-  // Quick inline price modification (persisted to Firestore instantly)
   const handleStartEditPrice = (product: RegisteredProduct) => {
     setEditingPriceId(product.id);
     setInlinePriceInput(product.price.toString());
@@ -150,24 +133,15 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
-      {/* Top Banner & Header */}
+      {/* Header with Search and Action - Identical to OrdersView */}
       <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 uppercase">
-                Catálogo Geral
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Banco de Dados em Tempo Real Ativo</span>
-              </span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 mt-1">
+            <h1 className="text-xl font-black tracking-tight text-slate-900">
               Produtos Cadastrados
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Toda a equipe pode editar o mesmo catálogo simultaneamente: fotos, preços e estoques são sincronizados na nuvem na mesma hora.
+              Tabela de preços, controle de estoque, imagens e emissão rápida de pedidos em tempo real.
             </p>
           </div>
 
@@ -180,317 +154,312 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           </button>
         </div>
 
-        {/* Real-time multi-user live banner */}
-        <div className="bg-gradient-to-r from-amber-50/80 via-slate-50 to-emerald-50/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-          <div className="flex items-start md:items-center gap-2.5">
+        {/* Real-time Multi-User Sync Banner - Identical to OrdersView */}
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/90 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-start sm:items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
-              <Zap className="w-4 h-4 text-emerald-600 animate-bounce" />
+              <Cloud className="w-4 h-4 text-emerald-600 animate-pulse" />
             </div>
             <div>
-              <div className="font-bold text-slate-900 flex items-center gap-2 flex-wrap">
-                <span>Edição Simultânea na Nuvem (Multi-Usuário)</span>
-                <span className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-full font-mono text-slate-600">
-                  Firebase Firestore
+              <div className="font-bold text-emerald-950 flex items-center gap-1.5 flex-wrap">
+                <span>Banco de Dados Firestore Conectado</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/80 text-emerald-900">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping"></span>
+                  Tempo Real Ativo
                 </span>
               </div>
-              <p className="text-[11px] text-slate-600 mt-0.5">
-                Altere o preço ou estoque direto no card ou pelo modal. A mudança aparece na tela de todos os computadores e celulares conectados no mesmo instante.
+              <p className="text-[11px] text-emerald-800/90 mt-0.5">
+                Vários computadores e celulares podem <strong>adicionar</strong>, <strong>editar</strong> e <strong>excluir</strong> produtos simultaneamente. As alterações aparecem instantaneamente para toda a equipe.
               </p>
             </div>
           </div>
-
-          {/* Real-time Activity Ticker */}
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            {lastProductChange && (
-              <div className="inline-flex items-center gap-1.5 text-[11px] bg-white border border-emerald-300 text-emerald-800 px-2.5 py-1 rounded-lg shadow-2xs animate-in fade-in">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span className="font-medium truncate max-w-[200px]">
-                  <strong>{lastProductChange.product.name}</strong> atualizado às {lastProductChange.time}
-                </span>
-              </div>
-            )}
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-slate-800 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-2xs">
-              <Package className="w-3.5 h-3.5 text-amber-600" />
-              <span>{totalProducts} produtos</span>
+          <div className="flex items-center gap-2 shrink-0 sm:self-center self-start">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-emerald-900 bg-white/90 border border-emerald-200 px-2.5 py-1 rounded-lg shadow-2xs">
+              <Users className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{products.length} produtos na nuvem</span>
             </span>
           </div>
         </div>
 
-        {/* Search and Category Filters */}
-        <div className="space-y-3 pt-2">
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por nome do produto, código (ex: PROD-001) ou categoria..."
-              className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-            />
-          </div>
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 text-xs">
+          {CATEGORIES_LIST.map((cat) => {
+            const isActive = selectedCategory === cat;
+            const count =
+              cat === 'Todos'
+                ? products.length
+                : products.filter((p) => p.category === cat).length;
 
-          {/* Category Tabs */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 text-xs">
-            {CATEGORIES_LIST.map((cat) => {
-              const isActive = selectedCategory === cat;
-              const count =
-                cat === 'Todos'
-                  ? products.length
-                  : products.filter((p) => p.category === cat).length;
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {cat} ({count})
+              </button>
+            );
+          })}
+        </div>
 
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer ${
-                    isActive
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {cat} ({count})
-                </button>
-              );
-            })}
-          </div>
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar por código (ex: PROD-001), nome do produto, categoria ou descrição..."
+            className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+          />
         </div>
       </div>
 
-      {/* Products Grid */}
+      {/* Products List - Full-width Card rows identical to OrdersView */}
       {filteredProducts.length === 0 ? (
-        <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 space-y-3">
-          <Package className="w-12 h-12 text-slate-300 mx-auto" />
-          <h3 className="text-base font-bold text-slate-800">Nenhum produto encontrado</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+        <div className="bg-white p-12 text-center rounded-2xl border border-slate-200">
+          <Package className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+          <h3 className="text-sm font-bold text-slate-700">Nenhum produto encontrado</h3>
+          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
             {searchTerm || selectedCategory !== 'Todos'
-              ? 'Nenhum produto corresponde aos filtros pesquisados. Tente limpar os filtros.'
-              : 'Você ainda não cadastrou produtos. Clique no botão acima para cadastrar seu primeiro produto com foto e preço!'}
+              ? 'Não há produtos correspondentes aos filtros selecionados.'
+              : 'Clique em "Adicionar Novo Produto" para cadastrar seu primeiro item com foto, preço e estoque.'}
           </p>
-          <button
-            onClick={handleOpenAddModal}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-amber-400" />
-            <span>Cadastrar Produto Agora</span>
-          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="space-y-3">
           {filteredProducts.map((prod) => {
             const isLowStock = prod.stockQuantity <= (prod.minStock ?? 5);
             const isOutOfStock = prod.stockQuantity === 0;
             const isRecentlyUpdated = lastModifiedProductId === prod.id;
+            const profit = prod.costPrice && prod.costPrice > 0
+              ? prod.price - prod.costPrice
+              : null;
+            const profitPercent = profit !== null && prod.costPrice && prod.costPrice > 0
+              ? Math.round((profit / prod.costPrice) * 100)
+              : null;
 
             return (
               <div
                 key={prod.id}
-                className={`bg-white rounded-2xl border shadow-2xs hover:shadow-sm transition-all duration-300 overflow-hidden flex flex-col group relative ${
+                className={`bg-white p-4 sm:p-5 rounded-xl border transition-all space-y-3 text-xs ${
                   isRecentlyUpdated
-                    ? 'border-emerald-500 ring-2 ring-emerald-400/80 shadow-emerald-100'
-                    : 'border-slate-200'
+                    ? 'border-emerald-400 ring-2 ring-emerald-400/50 bg-emerald-50/15 shadow-md'
+                    : 'border-slate-200 shadow-2xs hover:border-slate-300'
                 }`}
               >
-                {/* Live Real-time Modification Tag */}
-                {isRecentlyUpdated && (
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 animate-pulse">
-                    <Zap className="w-3 h-3 text-amber-300" />
-                    <span>Atualizado na Nuvem Agora</span>
-                  </div>
-                )}
+                {/* Header row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono font-bold text-sm text-slate-900">
+                      {prod.code}
+                    </span>
 
-                {/* Product Image Box */}
-                <div className="relative aspect-4/3 w-full bg-slate-100 overflow-hidden flex items-center justify-center border-b border-slate-100">
-                  {prod.imageUrl ? (
-                    <img
-                      src={prod.imageUrl}
-                      alt={prod.name}
-                      className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-slate-400 gap-1 p-4 text-center">
-                      <ImageIcon className="w-10 h-10 stroke-[1.5] text-slate-300" />
-                      <span className="text-[11px] font-medium">Sem imagem</span>
-                    </div>
-                  )}
+                    {isRecentlyUpdated && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-400 text-slate-950 flex items-center gap-1 shadow-xs animate-pulse">
+                        <Sparkles className="w-3 h-3" /> Atualizado Agora
+                      </span>
+                    )}
 
-                  {/* Category Pill Tag */}
-                  <div className="absolute top-2.5 left-2.5">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-900/80 text-white backdrop-blur-xs shadow-xs">
-                      <Tag className="w-2.5 h-2.5 text-amber-400" />
-                      <span>{prod.category}</span>
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                      {prod.category}
+                    </span>
+
+                    {isOutOfStock ? (
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-red-100 text-red-800 border border-red-200">
+                        Esgotado (0 un)
+                      </span>
+                    ) : isLowStock ? (
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                        Estoque Baixo ({prod.stockQuantity} {prod.unit})
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        Disponível ({prod.stockQuantity} {prod.unit})
+                      </span>
+                    )}
+
+                    <span className="text-slate-400 font-mono text-[11px]">
+                      Cadastrado em {formatDate(prod.createdAt)}
                     </span>
                   </div>
 
-                  {/* Stock Status Badge */}
-                  <div className="absolute top-2.5 right-2.5">
-                    {isOutOfStock ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-600 text-white shadow-xs">
-                        Esgotado
-                      </span>
-                    ) : isLowStock ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white shadow-xs">
-                        Estoque Baixo
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white shadow-xs">
-                        Disponível
-                      </span>
-                    )}
+                  {/* Stock Inline Stepper */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 text-[10px] font-bold uppercase">Estoque:</span>
+                    <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => handleStockQuickChange(prod.id, prod.stockQuantity, -1)}
+                        disabled={prod.stockQuantity <= 0}
+                        title="Diminuir estoque em 1"
+                        className="w-5 h-5 rounded bg-white border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+
+                      <input
+                        type="number"
+                        min="0"
+                        value={prod.stockQuantity}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          onUpdateStock(prod.id, isNaN(val) ? 0 : Math.max(0, val));
+                        }}
+                        className="w-12 text-center font-mono font-bold text-xs py-0.5 bg-white border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => handleStockQuickChange(prod.id, prod.stockQuantity, 1)}
+                        title="Aumentar estoque em 1"
+                        className="w-5 h-5 rounded bg-white border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-100 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                      <span className="text-[10px] text-slate-500 font-semibold px-1">{prod.unit}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Content Area */}
-                <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between gap-1 text-slate-400 font-mono text-[10px]">
-                      <span>{prod.code}</span>
-                      <span>{prod.unit}</span>
+                {/* Body row: Image, Specs and Financials */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                  {/* Product Image Thumbnail */}
+                  <div className="sm:col-span-2 flex items-center justify-center">
+                    {prod.imageUrl ? (
+                      <div className="w-20 h-20 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs group relative">
+                        <img
+                          src={prod.imageUrl}
+                          alt={prod.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 rounded-xl border border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-slate-400 gap-1">
+                        <ImageIcon className="w-6 h-6 stroke-[1.5] text-slate-300" />
+                        <span className="text-[9px]">Sem foto</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Product Specs */}
+                  <div className="sm:col-span-6 space-y-1">
+                    <div className="font-extrabold text-sm text-slate-900">
+                      {prod.name}
                     </div>
 
-                    <h3 className="font-extrabold text-sm text-slate-900 leading-snug line-clamp-2 mt-0.5">
-                      {prod.name}
-                    </h3>
-
                     {prod.description && (
-                      <p className="text-[11px] text-slate-500 line-clamp-2 mt-1">
+                      <p className="text-[11px] text-slate-600 line-clamp-2">
                         {prod.description}
                       </p>
                     )}
 
-                    {/* Width and Height if available */}
-                    {(prod.widthCm || prod.heightCm) && (
-                      <div className="text-[10px] text-slate-500 font-mono mt-1">
-                        Dimensões: {prod.widthCm || 0} x {prod.heightCm || 0} cm
-                      </div>
-                    )}
+                    <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-2 pt-0.5">
+                      {(prod.widthCm || prod.heightCm) && (
+                        <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                          Tamanho: {prod.widthCm || 0} x {prod.heightCm || 0} cm
+                        </span>
+                      )}
+                      <span className="bg-amber-50 text-amber-900 border border-amber-200 px-2 py-0.5 rounded font-bold text-[10px]">
+                        Unidade: {prod.unit}
+                      </span>
+                      {prod.minStock && prod.minStock > 0 && (
+                        <span className="text-slate-400 text-[10px]">
+                          (Alerta mín: {prod.minStock} {prod.unit})
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Price & Stock Section with Instant Collaborative Editing */}
-                  <div className="space-y-2.5 pt-2 border-t border-slate-100">
-                    <div className="flex items-baseline justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                            Preço de Venda
-                          </span>
-                          {editingPriceId !== prod.id && (
-                            <button
-                              type="button"
-                              onClick={() => handleStartEditPrice(prod)}
-                              className="text-slate-400 hover:text-amber-600 cursor-pointer p-0.5 rounded"
-                              title="Editar preço rapidamente e salvar na nuvem"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Inline price editor */}
-                        {editingPriceId === prod.id ? (
-                          <div className="flex items-center gap-1 mt-1">
-                            <span className="text-xs font-bold text-slate-400">R$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              autoFocus
-                              value={inlinePriceInput}
-                              onChange={(e) => setInlinePriceInput(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveInlinePrice(prod.id);
-                                if (e.key === 'Escape') setEditingPriceId(null);
-                              }}
-                              className="w-20 px-1.5 py-0.5 text-xs font-bold font-mono bg-amber-50 border border-amber-300 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleSaveInlinePrice(prod.id)}
-                              className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
-                              title="Salvar preço e atualizar para todos"
-                            >
-                              <Check className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditingPriceId(null)}
-                              className="p-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded cursor-pointer"
-                              title="Cancelar"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div
+                  {/* Financials Column */}
+                  <div className="sm:col-span-4 bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col justify-center space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Preço de Venda</span>
+                        {editingPriceId !== prod.id && (
+                          <button
+                            type="button"
                             onClick={() => handleStartEditPrice(prod)}
-                            className="text-lg font-black font-mono text-slate-900 cursor-pointer hover:text-amber-700 transition-colors inline-block"
-                            title="Clique para editar o preço"
+                            className="text-slate-400 hover:text-amber-600 cursor-pointer p-0.5 rounded"
+                            title="Editar preço rapidamente"
                           >
-                            {formatBRL(prod.price)}
-                          </div>
+                            <Pencil className="w-3 h-3" />
+                          </button>
                         )}
                       </div>
 
-                      {prod.costPrice && prod.costPrice > 0 && (
-                        <div className="text-right">
-                          <span className="text-[9px] uppercase text-slate-400">Custo Est.</span>
-                          <div className="text-xs font-mono font-medium text-slate-500">
-                            {formatBRL(prod.costPrice)}
-                          </div>
+                      {editingPriceId === prod.id ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs font-bold text-slate-400">R$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            autoFocus
+                            value={inlinePriceInput}
+                            onChange={(e) => setInlinePriceInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveInlinePrice(prod.id);
+                              if (e.key === 'Escape') setEditingPriceId(null);
+                            }}
+                            className="w-16 px-1 py-0.5 text-xs font-bold font-mono bg-white border border-amber-300 rounded"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveInlinePrice(prod.id)}
+                            className="p-1 bg-emerald-600 text-white rounded cursor-pointer"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
                         </div>
+                      ) : (
+                        <span
+                          onClick={() => handleStartEditPrice(prod)}
+                          className="font-mono font-black text-sm text-slate-900 hover:text-amber-700 cursor-pointer"
+                          title="Clique para editar preço"
+                        >
+                          {formatBRL(prod.price)}
+                        </span>
                       )}
                     </div>
 
-                    {/* Interactive Stock Quantity Editor (Real-Time Synchronized) */}
-                    <div className="bg-slate-50 p-2 rounded-xl border border-slate-200/80 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <Boxes className="w-3.5 h-3.5 text-slate-500" />
-                        <span className="text-[11px] font-bold text-slate-700">Qtd Estoque:</span>
+                    {prod.costPrice && prod.costPrice > 0 ? (
+                      <>
+                        <div className="flex items-center justify-between text-slate-500 text-[10px]">
+                          <span>Custo Estimado:</span>
+                          <span className="font-mono">{formatBRL(prod.costPrice)}</span>
+                        </div>
+                        {profitPercent !== null && (
+                          <div className="flex items-center justify-between text-[10px] text-emerald-700 font-bold border-t border-slate-200/60 pt-1">
+                            <span className="flex items-center gap-1">
+                              <TrendingUp className="w-3 h-3" /> Margem de Lucro:
+                            </span>
+                            <span className="font-mono">+{profitPercent}%</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-[10px] text-slate-400 italic">
+                        Sem custo de produção cadastrado
                       </div>
-
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleStockQuickChange(prod.id, prod.stockQuantity, -1)}
-                          disabled={prod.stockQuantity <= 0}
-                          title="Diminuir 1 unidade (sincroniza com todos)"
-                          className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-
-                        <input
-                          type="number"
-                          min="0"
-                          value={prod.stockQuantity}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            onUpdateStock(prod.id, isNaN(val) ? 0 : Math.max(0, val));
-                          }}
-                          className="w-14 text-center font-mono font-bold text-xs py-0.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500"
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() => handleStockQuickChange(prod.id, prod.stockQuantity, 1)}
-                          title="Aumentar 1 unidade (sincroniza com todos)"
-                          className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 cursor-pointer transition-colors shadow-2xs"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
+                    )}
                   </div>
+                </div>
 
-                  {/* Actions Bar */}
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5">
+                {/* Footer action buttons - Identical to OrdersView */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => onGenerateOrderForProduct(prod)}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-slate-900 bg-amber-400 hover:bg-amber-300 rounded-lg shadow-2xs transition-colors cursor-pointer"
-                      title="Gerar Ordem de Serviço ou Pedido com este produto"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                      title="Criar um Pedido / Ordem de Serviço com este produto"
                     >
                       <ShoppingCart className="w-3.5 h-3.5" />
                       <span>Gerar Pedido</span>
@@ -498,20 +467,26 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
 
                     <button
                       onClick={() => handleOpenEditModal(prod)}
-                      className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer transition-colors border border-slate-200"
-                      title="Editar foto, dados completos, preço e estoque"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg transition-colors cursor-pointer"
+                      title="Editar foto, dados e valores deste produto"
                     >
-                      <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                      <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Editar</span>
                     </button>
 
                     <button
                       onClick={() => setProductToDelete(prod)}
-                      className="p-1.5 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer transition-colors border border-red-200"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg transition-colors cursor-pointer"
                       title="Excluir este produto da nuvem"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                      <span>Excluir</span>
                     </button>
                   </div>
+
+                  <span className="text-[10px] text-slate-400 font-mono self-end sm:self-center">
+                    Valor total em estoque: {formatBRL(prod.price * prod.stockQuantity)}
+                  </span>
                 </div>
               </div>
             );
@@ -519,7 +494,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         </div>
       )}
 
-      {/* Modal: Adicionar / Editar Produto com Proteção de Conflito em Tempo Real */}
+      {/* Modal: Adicionar / Editar Produto */}
       {isModalOpen && (
         <ProductFormModal
           initialProduct={editingProduct}
@@ -532,7 +507,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         />
       )}
 
-      {/* Modal: Confirmação de Exclusão */}
+      {/* Delete Confirmation Modal - Identical to OrdersView */}
       {productToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
@@ -552,24 +527,12 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
             <div className="text-xs text-slate-600 space-y-2">
               <p>
                 Tem certeza que deseja excluir permanentemente o produto{' '}
-                <strong className="text-slate-900">{productToDelete.name}</strong> ({productToDelete.code})?
+                <strong className="text-slate-900 font-mono">{productToDelete.code}</strong> -{' '}
+                <strong className="text-slate-900">{productToDelete.name}</strong>?
               </p>
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-700 flex items-center gap-3">
-                {productToDelete.imageUrl ? (
-                  <img
-                    src={productToDelete.imageUrl}
-                    alt={productToDelete.name}
-                    className="w-12 h-12 object-cover rounded-lg border border-slate-200 shrink-0"
-                  />
-                ) : (
-                  <Package className="w-8 h-8 text-slate-400 shrink-0" />
-                )}
-                <div>
-                  <div className="font-bold text-slate-900">{productToDelete.name}</div>
-                  <div className="text-slate-500 font-mono text-[11px]">
-                    Preço: {formatBRL(productToDelete.price)} · Estoque: {productToDelete.stockQuantity} {productToDelete.unit}
-                  </div>
-                </div>
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-slate-700 font-medium">
+                <div>📦 Preço: {formatBRL(productToDelete.price)}</div>
+                <div className="text-slate-500 mt-0.5">Saldo em estoque: {productToDelete.stockQuantity} {productToDelete.unit}</div>
               </div>
               <p className="text-[11px] text-red-500 font-medium">
                 Esta ação remove o produto do banco de dados na nuvem para toda a equipe.
@@ -593,7 +556,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Sim, Excluir Produto</span>
+                <span>Sim, Excluir</span>
               </button>
             </div>
           </div>
@@ -634,37 +597,6 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [widthCm, setWidthCm] = useState<number | undefined>(initialProduct?.widthCm);
   const [heightCm, setHeightCm] = useState<number | undefined>(initialProduct?.heightCm);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Detect remote changes while modal is open
-  const latestRemoteProduct = useMemo(() => {
-    if (!initialProduct) return null;
-    return existingProducts.find((p) => p.id === initialProduct.id) || null;
-  }, [existingProducts, initialProduct]);
-
-  const hasRemoteConflict = useMemo(() => {
-    if (!initialProduct || !latestRemoteProduct) return false;
-    return (
-      latestRemoteProduct.updatedAt &&
-      initialProduct.updatedAt &&
-      latestRemoteProduct.updatedAt !== initialProduct.updatedAt
-    );
-  }, [initialProduct, latestRemoteProduct]);
-
-  const handleApplyLatestRemoteData = () => {
-    if (!latestRemoteProduct) return;
-    setName(latestRemoteProduct.name);
-    setCode(latestRemoteProduct.code);
-    setCategory(latestRemoteProduct.category);
-    setDescription(latestRemoteProduct.description || '');
-    setPrice(latestRemoteProduct.price);
-    setCostPrice(latestRemoteProduct.costPrice || 0);
-    setStockQuantity(latestRemoteProduct.stockQuantity);
-    setMinStock(latestRemoteProduct.minStock ?? 5);
-    setUnit(latestRemoteProduct.unit);
-    setImageUrl(latestRemoteProduct.imageUrl || '');
-    setWidthCm(latestRemoteProduct.widthCm);
-    setHeightCm(latestRemoteProduct.heightCm);
-  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -753,7 +685,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 {isEditing ? 'Editar Produto Cadastrado' : 'Cadastrar Novo Produto'}
               </h2>
               <p className="text-[11px] text-slate-400">
-                Qualquer edição salva aqui será transmitida para todos os computadores na mesma hora.
+                Sincronização instantânea na nuvem para toda a equipe.
               </p>
             </div>
           </div>
@@ -764,26 +696,6 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
-
-        {/* Remote Live Conflict Warning Banner */}
-        {hasRemoteConflict && latestRemoteProduct && (
-          <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center justify-between gap-3 text-xs text-amber-900">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>
-                <strong>Atenção:</strong> Outro membro da equipe acabou de editar este produto na nuvem (Preço: {formatBRL(latestRemoteProduct.price)} | Estoque: {latestRemoteProduct.stockQuantity} {latestRemoteProduct.unit}).
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleApplyLatestRemoteData}
-              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
-            >
-              <RefreshCw className="w-3 h-3" />
-              <span>Carregar Novos Dados</span>
-            </button>
-          </div>
-        )}
 
         {/* Modal Body Form */}
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 overflow-y-auto space-y-5 text-xs">
@@ -796,7 +708,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
             <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
               {/* Preview Box */}
-              <div className="w-28 h-28 rounded-xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs relative group">
+              <div className="w-24 h-24 rounded-xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs relative group">
                 {imageUrl ? (
                   <>
                     <img
@@ -815,7 +727,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </>
                 ) : (
                   <div className="text-center text-slate-400 p-2">
-                    <ImageIcon className="w-8 h-8 mx-auto stroke-[1.5] text-slate-300 mb-1" />
+                    <ImageIcon className="w-7 h-7 mx-auto stroke-[1.5] text-slate-300 mb-1" />
                     <span className="text-[10px]">Sem foto</span>
                   </div>
                 )}
@@ -871,7 +783,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* 2. Código e Nome do Produto */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
             <div className="sm:col-span-3 space-y-1">
-              <label className="font-bold text-slate-700">Código</label>
+              <label className="font-bold text-slate-700">Código (SKU)</label>
               <input
                 type="text"
                 required
