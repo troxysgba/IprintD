@@ -1,19 +1,18 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Equipment, Material, Order, OrderStatus } from '../types';
 import { formatBRL, formatDate } from '../utils/calculator';
 import {
   AlertTriangle,
   ArrowRight,
   Boxes,
-  CheckCircle2,
-  Clock,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
   Cpu,
   Layers,
   PlusCircle,
-  Printer,
   ShoppingBag,
   TrendingUp,
-  User,
 } from 'lucide-react';
 
 interface OverviewViewProps {
@@ -35,6 +34,46 @@ const STATUS_LABELS: Record<OrderStatus, { label: string; color: string }> = {
   cancelado: { label: 'Cancelado', color: 'bg-red-100 text-red-800' },
 };
 
+const MONTH_NAMES_FULL = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+];
+
+const MONTH_NAMES_SHORT = [
+  'Jan',
+  'Fev',
+  'Mar',
+  'Abr',
+  'Mai',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Set',
+  'Out',
+  'Nov',
+  'Dez',
+];
+
+function getOrderYearMonth(createdAt: string): { year: number; month: number } | null {
+  if (!createdAt) return null;
+  const d = new Date(createdAt);
+  if (isNaN(d.getTime())) return null;
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth() + 1, // 1..12
+  };
+}
+
 export const OverviewView: React.FC<OverviewViewProps> = ({
   orders,
   materials,
@@ -44,18 +83,117 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onUpdateOrderStatus,
   onSelectOrder,
 }) => {
-  const confirmedOrders = orders.filter((o) => o.type === 'pedido' && o.status !== 'cancelado');
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  // 'all' or specific month (1..12)
+  const [selectedMonth, setSelectedMonth] = useState<'all' | number>(currentMonth);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+
+  // Available years dynamically collected from orders + currentYear
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set<number>([currentYear]);
+    orders.forEach((o) => {
+      const ym = getOrderYearMonth(o.createdAt);
+      if (ym) yearsSet.add(ym.year);
+    });
+    return Array.from(yearsSet).sort((a, b) => b - a);
+  }, [orders, currentYear]);
+
+  // Orders filtered by selected period (either all-time or specific month+year)
+  const periodOrders = useMemo(() => {
+    if (selectedMonth === 'all') {
+      return orders;
+    }
+    return orders.filter((o) => {
+      const ym = getOrderYearMonth(o.createdAt);
+      return ym && ym.year === selectedYear && ym.month === selectedMonth;
+    });
+  }, [orders, selectedMonth, selectedYear]);
+
+  // KPIs calculated for the selected period
+  const confirmedOrders = useMemo(
+    () => periodOrders.filter((o) => o.type === 'pedido' && o.status !== 'cancelado'),
+    [periodOrders]
+  );
   const totalRevenue = confirmedOrders.reduce((sum, o) => sum + o.finalPrice, 0);
   const totalCost = confirmedOrders.reduce((sum, o) => sum + o.totalCost, 0);
   const netProfit = Math.max(0, totalRevenue - totalCost);
   const marginPercent = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+  const averageTicket = confirmedOrders.length > 0 ? totalRevenue / confirmedOrders.length : 0;
 
-  const inProductionOrders = orders.filter(
+  const inProductionOrders = periodOrders.filter(
     (o) => o.type === 'pedido' && ['aprovado', 'em_producao'].includes(o.status)
   );
-  const readyOrders = orders.filter((o) => o.status === 'pronto');
-  const quotesCount = orders.filter((o) => o.type === 'orcamento').length;
+  const readyOrders = periodOrders.filter((o) => o.status === 'pronto');
+  const deliveredOrders = periodOrders.filter((o) => o.status === 'entregue');
+  const quotes = periodOrders.filter((o) => o.type === 'orcamento');
+  const quotesCount = quotes.length;
+  const quotesTotalValue = quotes.reduce((sum, o) => sum + o.finalPrice, 0);
+
   const lowStockItems = materials.filter((m) => m.currentStock <= m.minStock);
+
+  // Monthly breakdown for all 12 months of selectedYear
+  const monthlyStats = useMemo(() => {
+    return Array.from({ length: 12 }, (_, idx) => {
+      const monthNumber = idx + 1;
+      const monthOrders = orders.filter((o) => {
+        const ym = getOrderYearMonth(o.createdAt);
+        return ym && ym.year === selectedYear && ym.month === monthNumber;
+      });
+      const monthConfirmed = monthOrders.filter(
+        (o) => o.type === 'pedido' && o.status !== 'cancelado'
+      );
+      const revenue = monthConfirmed.reduce((sum, o) => sum + o.finalPrice, 0);
+      const cost = monthConfirmed.reduce((sum, o) => sum + o.totalCost, 0);
+      const profit = Math.max(0, revenue - cost);
+      const monthQuotes = monthOrders.filter((o) => o.type === 'orcamento').length;
+
+      return {
+        month: monthNumber,
+        shortName: MONTH_NAMES_SHORT[idx],
+        fullName: MONTH_NAMES_FULL[idx],
+        ordersCount: monthConfirmed.length,
+        quotesCount: monthQuotes,
+        revenue,
+        profit,
+      };
+    });
+  }, [orders, selectedYear]);
+
+  const handlePrevMonth = () => {
+    if (selectedMonth === 'all') {
+      setSelectedMonth(currentMonth);
+      setSelectedYear(currentYear);
+      return;
+    }
+    if (selectedMonth === 1) {
+      setSelectedMonth(12);
+      setSelectedYear((y) => y - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (selectedMonth === 'all') {
+      setSelectedMonth(currentMonth);
+      setSelectedYear(currentYear);
+      return;
+    }
+    if (selectedMonth === 12) {
+      setSelectedMonth(1);
+      setSelectedYear((y) => y + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+  };
+
+  const activePeriodLabel =
+    selectedMonth === 'all'
+      ? 'Todo o Histórico'
+      : `${MONTH_NAMES_FULL[selectedMonth - 1]} de ${selectedYear}`;
 
   const getNextStage = (status: OrderStatus): OrderStatus | null => {
     switch (status) {
@@ -97,6 +235,157 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </button>
       </div>
 
+      {/* Month & Year Filter Bar */}
+      <div className="bg-white px-3.5 py-3 sm:px-4 rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-200/80 flex items-center justify-center shrink-0">
+              <Calendar className="w-3.5 h-3.5 text-amber-600" />
+            </div>
+            <span className="text-xs font-bold text-slate-700 whitespace-nowrap">
+              Período:
+            </span>
+            <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-slate-900 text-amber-400 truncate">
+              {activePeriodLabel}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/70">
+              <button
+                type="button"
+                onClick={() => setSelectedMonth('all')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer ${
+                  selectedMonth === 'all'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Todos
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedYear(currentYear);
+                  setSelectedMonth(currentMonth);
+                }}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer ${
+                  selectedMonth === currentMonth && selectedYear === currentYear
+                    ? 'bg-amber-400 text-slate-950 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Mês Atual
+              </button>
+            </div>
+
+            <div className="inline-flex items-center gap-0.5 bg-slate-50 px-1 py-0.5 rounded-lg border border-slate-200">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                title="Mês anterior"
+                className="p-1 rounded-md hover:bg-white hover:shadow-2xs text-slate-600 hover:text-slate-900 cursor-pointer transition-all"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+
+              <select
+                value={selectedMonth}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSelectedMonth(v === 'all' ? 'all' : Number(v));
+                }}
+                aria-label="Selecionar mês"
+                className="bg-transparent text-[11px] font-bold text-slate-800 px-1 py-0.5 focus:outline-none cursor-pointer"
+              >
+                <option value="all">Todos os meses</option>
+                {MONTH_NAMES_FULL.map((name, index) => (
+                  <option key={name} value={index + 1}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+
+              <span className="text-slate-300 text-xs">/</span>
+
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                aria-label="Selecionar ano"
+                className="bg-transparent text-[11px] font-mono font-bold text-slate-800 px-1 py-0.5 focus:outline-none cursor-pointer"
+              >
+                {availableYears.map((yr) => (
+                  <option key={yr} value={yr}>
+                    {yr}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                title="Próximo mês"
+                className="p-1 rounded-md hover:bg-white hover:shadow-2xs text-slate-600 hover:text-slate-900 cursor-pointer transition-all"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Compact 12-Month Comparative Strip */}
+        <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1 pt-2 border-t border-slate-100">
+          {monthlyStats.map((m) => {
+            const isSelected = selectedMonth === m.month;
+            const hasData = m.ordersCount > 0 || m.quotesCount > 0;
+            return (
+              <button
+                key={m.month}
+                type="button"
+                onClick={() => setSelectedMonth(m.month)}
+                title={`${m.fullName} ${selectedYear}: ${m.ordersCount} pedidos • ${formatBRL(m.revenue)}`}
+                className={`px-2 py-1.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  isSelected
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                    : hasData
+                    ? 'bg-white hover:bg-amber-50/40 text-slate-900 border-slate-200 hover:border-amber-300'
+                    : 'bg-slate-50/70 hover:bg-slate-100 text-slate-400 border-transparent hover:border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wide ${
+                      isSelected ? 'text-amber-400' : hasData ? 'text-slate-600' : 'text-slate-400'
+                    }`}
+                  >
+                    {m.shortName}
+                  </span>
+                  {hasData && (
+                    <span
+                      className={`text-[9px] font-mono font-bold px-1 rounded leading-tight ${
+                        isSelected
+                          ? 'bg-amber-400/20 text-amber-300'
+                          : 'bg-emerald-50 text-emerald-700'
+                      }`}
+                    >
+                      {m.ordersCount}
+                    </span>
+                  )}
+                </div>
+                <div
+                  className={`text-[10px] font-mono font-bold truncate mt-0.5 tabular-nums ${
+                    isSelected ? 'text-white' : hasData ? 'text-slate-900' : 'text-slate-300'
+                  }`}
+                >
+                  {hasData ? formatBRL(m.revenue) : '—'}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* KPI Cards Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs">
@@ -108,7 +397,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             {formatBRL(totalRevenue)}
           </div>
           <div className="text-[11px] text-slate-400 mt-0.5">
-            {confirmedOrders.length} pedidos confirmados
+            {confirmedOrders.length} pedidos · Ticket: {formatBRL(averageTicket)}
           </div>
         </div>
 
@@ -136,7 +425,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             {inProductionOrders.length}
           </div>
           <div className="text-[11px] text-slate-400 mt-0.5">
-            {readyOrders.length} prontas p/ entrega
+            {readyOrders.length} prontas · {deliveredOrders.length} entregues
           </div>
         </div>
 
@@ -149,7 +438,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             {quotesCount}
           </div>
           <div className="text-[11px] text-slate-400 mt-0.5">
-            Aguardando aprovação
+            Total orçado: {formatBRL(quotesTotalValue)}
           </div>
         </div>
       </div>
@@ -184,10 +473,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900">
-              Ordens Recentes na Oficina
+              Ordens do Período ({activePeriodLabel})
             </h2>
             <p className="text-xs text-slate-500">
-              Acompanhe e avance o status dos trabalhos em impressão e acabamento.
+              Acompanhe e avance o status dos trabalhos registrados no período selecionado.
             </p>
           </div>
 
@@ -200,76 +489,91 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
 
         <div className="space-y-2.5">
-          {orders.slice(0, 5).map((ord) => {
-            const next = getNextStage(ord.status);
-            const statusConfig = STATUS_LABELS[ord.status] || STATUS_LABELS.orcamento;
+          {periodOrders.length === 0 ? (
+            <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs text-slate-500 space-y-2">
+              <p>Nenhum pedido ou orçamento encontrado em {activePeriodLabel}.</p>
+              {selectedMonth !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonth('all')}
+                  className="text-amber-700 font-bold hover:underline cursor-pointer"
+                >
+                  Mostrar todo o histórico
+                </button>
+              )}
+            </div>
+          ) : (
+            periodOrders.slice(0, 5).map((ord) => {
+              const next = getNextStage(ord.status);
+              const statusConfig = STATUS_LABELS[ord.status] || STATUS_LABELS.orcamento;
 
-            return (
-              <div
-                key={ord.id}
-                className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80 hover:border-slate-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono font-bold text-slate-900 text-sm">
-                      {ord.code}
-                    </span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${statusConfig.color}`}>
-                      {statusConfig.label}
-                    </span>
-                    <span className="text-slate-400 font-mono text-[11px]">
-                      {formatDate(ord.createdAt)}
-                    </span>
-                  </div>
-
-                  <div className="font-semibold text-slate-900 text-sm">
-                    {ord.clientName}
-                    {ord.clientPhone && (
-                      <span className="font-mono text-slate-500 text-xs font-normal ml-2">
-                        {ord.clientPhone}
+              return (
+                <div
+                  key={ord.id}
+                  className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80 hover:border-slate-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono font-bold text-slate-900 text-sm">
+                        {ord.code}
                       </span>
-                    )}
-                  </div>
-
-                  <div className="text-slate-600 text-xs">
-                    <span className="font-bold text-slate-800">{ord.quantity.toLocaleString('pt-BR')}x</span>{' '}
-                    {ord.productName} ({ord.materialName})
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200">
-                  <div className="text-left sm:text-right">
-                    <div className="text-base font-black font-mono text-slate-900 tabular-nums">
-                      {formatBRL(ord.finalPrice)}
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${statusConfig.color}`}>
+                        {statusConfig.label}
+                      </span>
+                      <span className="text-slate-400 font-mono text-[11px]">
+                        {formatDate(ord.createdAt)}
+                      </span>
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono">
-                      {formatBRL(ord.unitPrice)}/un
+
+                    <div className="font-semibold text-slate-900 text-sm">
+                      {ord.clientName}
+                      {ord.clientPhone && (
+                        <span className="font-mono text-slate-500 text-xs font-normal ml-2">
+                          {ord.clientPhone}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-slate-600 text-xs">
+                      <span className="font-bold text-slate-800">{ord.quantity.toLocaleString('pt-BR')}x</span>{' '}
+                      {ord.productName} ({ord.materialName})
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => onSelectOrder(ord)}
-                      className="px-2.5 py-1.5 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg transition-colors cursor-pointer"
-                    >
-                      Detalhes
-                    </button>
+                  <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200">
+                    <div className="text-left sm:text-right">
+                      <div className="text-base font-black font-mono text-slate-900 tabular-nums">
+                        {formatBRL(ord.finalPrice)}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        {formatBRL(ord.unitPrice)}/un
+                      </div>
+                    </div>
 
-                    {next && (
+                    <div className="flex items-center gap-1.5">
                       <button
-                        onClick={() => onUpdateOrderStatus(ord.id, next)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors cursor-pointer"
-                        title={`Avançar para: ${next}`}
+                        onClick={() => onSelectOrder(ord)}
+                        className="px-2.5 py-1.5 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg transition-colors cursor-pointer"
                       >
-                        <span>Avançar</span>
-                        <ArrowRight className="w-3 h-3 text-amber-400" />
+                        Detalhes
                       </button>
-                    )}
+
+                      {next && (
+                        <button
+                          onClick={() => onUpdateOrderStatus(ord.id, next)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors cursor-pointer"
+                          title={`Avançar para: ${next}`}
+                        >
+                          <span>Avançar</span>
+                          <ArrowRight className="w-3 h-3 text-amber-400" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
 
